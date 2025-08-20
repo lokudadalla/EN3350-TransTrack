@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type { Transformer, TransformerKind } from "../types";
 import {
   listTransformers,
@@ -19,6 +19,8 @@ type EditState = {
 };
 
 export default function Transformers() {
+  const navigate = useNavigate();
+
   const [items, setItems] = useState<Transformer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -26,10 +28,17 @@ export default function Transformers() {
 
   // Add form (used in modal)
   const initialForm: EditState = {
-    id: "", region: "", poleNo: "", type: "Distribution", locationDetails: "",
+    id: "",
+    region: "",
+    poleNo: "",
+    type: "Distribution",
+    locationDetails: "",
   };
   const [form, setForm] = useState<EditState>(initialForm);
-  const [open, setOpen] = useState(false);
+  const [openAdd, setOpenAdd] = useState(false);
+
+  // Delete confirmation
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const ids = useMemo(() => new Set(items.map((i) => i.id)), [items]);
 
@@ -46,7 +55,9 @@ export default function Transformers() {
       setLoading(false);
     }
   }
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   function validate(t: EditState) {
     if (!t.region.trim()) return "Region is required.";
@@ -71,17 +82,18 @@ export default function Transformers() {
       };
       await createTransformer(payload);
       setForm(initialForm);
-      setOpen(false);
+      setOpenAdd(false);
       await refresh();
     } catch (e: any) {
       alert(e?.message ?? "Create failed");
     }
   }
 
-  async function onDelete(id: string) {
-    if (!confirm(`Delete transformer ${id}?`)) return;
+  async function doDelete() {
+    if (!confirmId) return;
     try {
-      await deleteTransformer(id);
+      await deleteTransformer(confirmId);
+      setConfirmId(null);
       await refresh();
     } catch (e: any) {
       alert(e?.message ?? "Delete failed");
@@ -102,7 +114,10 @@ export default function Transformers() {
       locationDetails: row.locationDetails ?? "",
     });
   }
-  function cancelEdit() { setEditingId(null); setEdit(null); }
+  function cancelEdit() {
+    setEditingId(null);
+    setEdit(null);
+  }
   async function saveEdit() {
     if (!edit) return;
     const err = validate(edit);
@@ -124,17 +139,28 @@ export default function Transformers() {
     }
   }
 
+  function handleView(id: string) {
+    // Later you can swap this to open a custom detail modal.
+    navigate(`/transformers/${id}`);
+  }
+
   return (
     <div className="vstack" style={{ gap: 16 }}>
       {/* header row with Add button */}
       <div className="hstack" style={{ justifyContent: "space-between" }}>
-        <div className="section-title" style={{ fontSize: 22 }}>Transformers</div>
-        <button className="btn-launch" onClick={() => setOpen(true)}>Add Transformer</button>
+        <div className="section-title" style={{ fontSize: 22 }}>
+          Transformers
+        </div>
+        <button className="btn-launch" onClick={() => setOpenAdd(true)}>
+          Add Transformer
+        </button>
       </div>
 
       {/* Table Card */}
       <div className="card">
-        {error && <p style={{ color: "#dc2626", marginBottom: 8 }}>{error}</p>}
+        {error && (
+          <p style={{ color: "#dc2626", marginBottom: 8 }}>{error}</p>
+        )}
         <table className="table">
           <thead>
             <tr>
@@ -148,9 +174,15 @@ export default function Transformers() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6}>Loading…</td></tr>
+              <tr>
+                <td colSpan={6}>Loading…</td>
+              </tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={6} className="subtle">No transformers yet.</td></tr>
+              <tr>
+                <td colSpan={6} className="subtle">
+                  No transformers yet.
+                </td>
+              </tr>
             ) : (
               items.map((t) => {
                 const isEditing = editingId === t.id;
@@ -163,12 +195,22 @@ export default function Transformers() {
                         <select
                           className="input"
                           value={edit?.region ?? ""}
-                          onChange={(e) => setEdit(s => s ? { ...s, region: e.target.value } : s)}
+                          onChange={(e) =>
+                            setEdit((s) =>
+                              s ? { ...s, region: e.target.value } : s
+                            )
+                          }
                         >
                           <option value="">Region</option>
-                          {REGIONS_SL.map(r => <option key={r} value={r}>{r}</option>)}
+                          {REGIONS_SL.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
                         </select>
-                      ) : t.region}
+                      ) : (
+                        t.region
+                      )}
                     </td>
 
                     <td>
@@ -176,9 +218,15 @@ export default function Transformers() {
                         <input
                           className="input"
                           value={edit?.poleNo ?? ""}
-                          onChange={(e) => setEdit(s => s ? { ...s, poleNo: e.target.value } : s)}
+                          onChange={(e) =>
+                            setEdit((s) =>
+                              s ? { ...s, poleNo: e.target.value } : s
+                            )
+                          }
                         />
-                      ) : t.poleNo}
+                      ) : (
+                        t.poleNo
+                      )}
                     </td>
 
                     <td>
@@ -186,12 +234,24 @@ export default function Transformers() {
                         <select
                           className="input"
                           value={edit?.type ?? "Distribution"}
-                          onChange={(e) => setEdit(s => s ? { ...s, type: e.target.value as TransformerKind } : s)}
+                          onChange={(e) =>
+                            setEdit((s) =>
+                              s
+                                ? {
+                                    ...s,
+                                    type: e.target
+                                      .value as TransformerKind,
+                                  }
+                                : s
+                            )
+                          }
                         >
                           <option value="Distribution">Distribution</option>
                           <option value="Bulk">Bulk</option>
                         </select>
-                      ) : t.type}
+                      ) : (
+                        t.type
+                      )}
                     </td>
 
                     <td>
@@ -199,28 +259,83 @@ export default function Transformers() {
                         <input
                           className="input"
                           value={edit?.locationDetails ?? ""}
-                          onChange={(e) => setEdit(s => s ? { ...s, locationDetails: e.target.value } : s)}
+                          onChange={(e) =>
+                            setEdit((s) =>
+                              s
+                                ? {
+                                    ...s,
+                                    locationDetails: e.target.value,
+                                  }
+                                : s
+                            )
+                          }
                         />
-                      ) : t.locationDetails}
+                      ) : (
+                        t.locationDetails
+                      )}
                     </td>
 
                     <td>
-                      <div className="hstack" style={{ justifyContent: "flex-end" }}>
-                        <Link className="btn" to={`/transformers/${t.id}`}>Open</Link>
+                      <div
+                        className="hstack"
+                        style={{ justifyContent: "flex-end", gap: 8 }}
+                      >
+                        {/* VIEW (purple/blue, longer text button) */}
+                        {!isEditing && (
+                          <button
+                            onClick={() => handleView(t.id)}
+                            style={{
+                              background: "#3f51b5",
+                              color: "#fff",
+                              border: 0,
+                              padding: "6px 14px",
+                              borderRadius: 10,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            View
+                          </button>
+                        )}
+
+                        {/* EDIT / SAVE / CANCEL */}
                         {isEditing ? (
                           <>
-                            <button className="btn btn-primary" onClick={saveEdit} disabled={saving === t.id}>
+                            <button
+                              className="btn btn-primary"
+                              onClick={saveEdit}
+                              disabled={saving === t.id}
+                            >
                               {saving === t.id ? "Saving…" : "Save"}
                             </button>
-                            <button className="btn" onClick={cancelEdit}>Cancel</button>
-                          </>
-                        ) : (
-                          <>
-                            <button className="btn" onClick={() => startEdit(t)}>Edit</button>
-                            <button className="btn" style={{ color:"#dc2626" }} onClick={() => onDelete(t.id)}>
-                              Delete
+                            <button className="btn" onClick={cancelEdit}>
+                              Cancel
                             </button>
                           </>
+                        ) : (
+                          <button className="btn" onClick={() => startEdit(t)}>
+                            Edit
+                          </button>
+                        )}
+
+                        {/* DELETE (short red icon button) */}
+                        {!isEditing && (
+                          <button
+                            aria-label={`Delete ${t.id}`}
+                            onClick={() => setConfirmId(t.id)}
+                            style={{
+                              background: "#dc2626",
+                              color: "#fff",
+                              border: 0,
+                              padding: "6px 10px",
+                              borderRadius: 10,
+                              cursor: "pointer",
+                              fontSize: 16,
+                            }}
+                            title="Delete"
+                          >
+                            🗑
+                          </button>
                         )}
                       </div>
                     </td>
@@ -232,28 +347,54 @@ export default function Transformers() {
         </table>
       </div>
 
-      {/* Modal with form */}
+      {/* Add Transformer Modal */}
       <Modal
-        open={open}
+        open={openAdd}
         title="Add Transformer"
-        onClose={() => { setOpen(false); setForm(initialForm); }}
+        onClose={() => {
+          setOpenAdd(false);
+          setForm(initialForm);
+        }}
         footer={
           <>
-            <button className="btn-cta" form="add-transformer-form" type="submit">Confirm</button>
-            <button className="btn-ghost" onClick={() => { setOpen(false); setForm(initialForm); }}>Cancel</button>
+            <button
+              className="btn-cta"
+              form="add-transformer-form"
+              type="submit"
+            >
+              Confirm
+            </button>
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                setOpenAdd(false);
+                setForm(initialForm);
+              }}
+            >
+              Cancel
+            </button>
           </>
         }
       >
-        <form id="add-transformer-form" onSubmit={onCreate} className="vstack" style={{ gap: 14 }}>
+        <form
+          id="add-transformer-form"
+          onSubmit={onCreate}
+          className="vstack"
+          style={{ gap: 14 }}
+        >
           <div className="vstack">
             <label className="subtle">Regions</label>
             <select
               className="input"
               value={form.region}
-              onChange={(e) => setForm(f => ({ ...f, region: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
             >
               <option value="">Region</option>
-              {REGIONS_SL.map((r) => <option key={r} value={r}>{r}</option>)}
+              {REGIONS_SL.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -263,7 +404,7 @@ export default function Transformers() {
               className="input"
               placeholder="Transformer No"
               value={form.id}
-              onChange={(e) => setForm(f => ({ ...f, id: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))}
             />
           </div>
 
@@ -273,7 +414,9 @@ export default function Transformers() {
               className="input"
               placeholder="Pole No"
               value={form.poleNo}
-              onChange={(e) => setForm(f => ({ ...f, poleNo: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, poleNo: e.target.value }))
+              }
             />
           </div>
 
@@ -282,7 +425,12 @@ export default function Transformers() {
             <select
               className="input"
               value={form.type}
-              onChange={(e) => setForm(f => ({ ...f, type: e.target.value as TransformerKind }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  type: e.target.value as TransformerKind,
+                }))
+              }
             >
               <option value="Distribution">Distribution</option>
               <option value="Bulk">Bulk</option>
@@ -292,12 +440,49 @@ export default function Transformers() {
           <div className="vstack">
             <label className="subtle">Location Details</label>
             <textarea
-              className="input" rows={3} placeholder="Location Details"
+              className="input"
+              rows={3}
+              placeholder="Location Details"
               value={form.locationDetails}
-              onChange={(e) => setForm(f => ({ ...f, locationDetails: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, locationDetails: e.target.value }))
+              }
             />
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={confirmId !== null}
+        title="Delete transformer"
+        onClose={() => setConfirmId(null)}
+        footer={
+          <>
+            <button
+              onClick={doDelete}
+              style={{
+                background: "#dc2626",
+                color: "#fff",
+                border: 0,
+                padding: "10px 16px",
+                borderRadius: 10,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Yes, delete
+            </button>
+            <button className="btn-ghost" onClick={() => setConfirmId(null)}>
+              No
+            </button>
+          </>
+        }
+      >
+        <p>
+          Are you sure you want to delete transformer{" "}
+          <b>{confirmId}</b>?
+        </p>
       </Modal>
     </div>
   );
