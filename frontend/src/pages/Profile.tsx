@@ -2,9 +2,9 @@
 import { useState } from "react";
 
 export default function Profile() {
-  const [name, setName] = useState("Olivera Queen");
-  const [email, setEmail] = useState("olivera@gmail.com");
-  const [role, setRole] = useState("Engineer");
+  const [name, setName] = useState("Trans Track");
+  const [email, setEmail] = useState("transtrack@gmail.com");
+  const [role, setRole] = useState("Electronic Engineer");
 
   function save(e: React.FormEvent) {
     e.preventDefault();

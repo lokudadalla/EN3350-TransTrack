@@ -57,8 +57,8 @@ export default function App() {
         {/* User menu (replaces the old Transformers link) */}
         <UserMenu
           user={{
-            name: "Olivera Queen",
-            email: "olivera@gmail.com",
+            name: "Trans Track",
+            email: "transtrack@gmail.com",
             avatarUrl:
               "https://i.pravatar.cc/64?img=12", // placeholder avatar
           }}
