@@ -89,3 +89,61 @@ a:hover { text-decoration: underline; }
 .center-top { display:flex; justify-content:center; padding-top: 40px; }
 .section-title { margin:0 0 12px; font-size:18px; font-weight:700; }
 .subtle { color: var(--muted); }
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid; place-items: center;
+  z-index: 1000;
+  animation: fadeIn 120ms ease-out;
+}
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+.modal {
+  width: min(920px, 92vw);
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.35);
+  overflow: hidden;
+}
+
+.modal-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbff;
+}
+.modal-title { font-weight: 700; font-size: 18px; }
+.modal-close {
+  border:none; background:transparent; cursor:pointer;
+  font-size: 22px; line-height: 1; color: #475569; padding: 4px 8px;
+}
+.modal-body { padding: 20px; }
+.modal-footer {
+  display:flex; gap:12px; padding: 16px 20px; border-top: 1px solid var(--border);
+}
+
+/* Purple CTA like screenshot */
+.btn-cta {
+  background: #3a2bbf; /* deep purple */
+  color: #fff; padding: 11px 18px; border-radius: 12px;
+  border: 0; cursor: pointer; font-weight: 700;
+  box-shadow: 0 10px 18px rgba(58, 43, 191, 0.28);
+}
+.btn-cta:hover { background: #3326a9; }
+.btn-ghost {
+  background:#f3f4f6; color:#111827;
+  padding: 11px 16px; border-radius: 10px; border: 1px solid #e5e7eb;
+  cursor: pointer;
+}
+
+/* Launcher button (purple pill) */
+.btn-launch {
+  background:#3a2bbf; color:#fff; border:0; cursor:pointer;
+  padding: 10px 16px; border-radius: 999px; font-weight: 600;
+  box-shadow: 0 10px 18px rgba(58, 43, 191, 0.28);
+}
+.btn-launch:hover { background:#3326a9; }
