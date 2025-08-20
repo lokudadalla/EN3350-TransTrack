@@ -47,46 +47,73 @@ export default function Transformers() {
   }
 
   return (
-    <div>
-      <h3>Transformers</h3>
+    <div className="vstack" style={{gap:16}}>
+      {/* Card: Add transformer */}
+      <div className="card">
+        <div className="section-title">Transformers</div>
+        <form onSubmit={onCreate} className="hstack" style={{flexWrap:"wrap", rowGap:8}}>
+          <input
+            className="input"
+            style={{width:220}}
+            placeholder="ID (e.g., T-001)"
+            value={form.id}
+            onChange={e => setForm(f => ({ ...f, id: e.target.value }))}
+          />
+          <input
+            className="input"
+            style={{width:320}}
+            placeholder="Location"
+            value={form.location}
+            onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+          />
+          <input
+            className="input"
+            style={{width:260}}
+            placeholder="Capacity (e.g., 250 kVA)"
+            value={form.capacity}
+            onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))}
+          />
+          <button className="btn btn-primary" type="submit">Add</button>
+        </form>
+        {error && <p style={{color:"#dc2626", marginTop:8}}>{error}</p>}
+      </div>
 
-      <form onSubmit={onCreate} style={{ display:"grid", gap:8, gridTemplateColumns:"1fr 1fr 1fr auto", marginBottom:16 }}>
-        <input placeholder="ID (e.g., T-001)" value={form.id}
-               onChange={e => setForm(f => ({ ...f, id: e.target.value }))} />
-        <input placeholder="Location" value={form.location}
-               onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
-        <input placeholder="Capacity (e.g., 250 kVA)" value={form.capacity}
-               onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} />
-        <button type="submit">Add</button>
-      </form>
-
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      {loading ? <p>Loading…</p> : (
-        <table width="100%" cellPadding={8} style={{ borderCollapse:"collapse" }}>
+      {/* Card: Table */}
+      <div className="card">
+        <table className="table">
           <thead>
-            <tr style={{ background:"#f3f3f3" }}>
-              <th align="left">ID</th>
-              <th align="left">Location</th>
-              <th align="left">Capacity</th>
-              <th>Actions</th>
+            <tr>
+              <th>ID</th>
+              <th>Location</th>
+              <th>Capacity</th>
+              <th style={{textAlign:"right"}}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map(t => (
-              <tr key={t.id} style={{ borderTop:"1px solid #ddd" }}>
-                <td>{t.id}</td>
-                <td>{t.location}</td>
-                <td>{t.capacity}</td>
-                <td style={{ display:"flex", gap:8 }}>
-                  <Link to={`/transformers/${t.id}`}>Open</Link>
-                  <button onClick={() => onDelete(t.id)}>Delete</button>
-                </td>
-              </tr>
-            ))}
-            {items.length === 0 && <tr><td colSpan={4}>No transformers yet.</td></tr>}
+            {loading ? (
+              <tr><td colSpan={4}>Loading…</td></tr>
+            ) : items.length === 0 ? (
+              <tr><td colSpan={4} className="subtle">No transformers yet.</td></tr>
+            ) : (
+              items.map(t => (
+                <tr key={t.id}>
+                  <td style={{fontWeight:600}}>{t.id}</td>
+                  <td>{t.location}</td>
+                  <td>{t.capacity}</td>
+                  <td>
+                    <div className="hstack" style={{justifyContent:"flex-end"}}>
+                      <Link className="btn" to={`/transformers/${t.id}`}>Open</Link>
+                      <button className="btn" style={{color:"#dc2626"}} onClick={() => onDelete(t.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-      )}
+      </div>
     </div>
   );
 }
