@@ -21,6 +21,14 @@ export async function getTransformer(id: string): Promise<Transformer> {
   const { data } = await api.get(`/transformers/${id}`);
   return data as Transformer;
 }
+export async function updateTransformer(
+  id: string,
+  patch: Partial<Transformer>
+): Promise<Transformer> {
+  // If your backend uses PATCH instead, change put -> patch
+  const { data } = await api.put(`/transformers/${id}`, patch);
+  return data as Transformer;
+}
 
 // Images
 export async function listImages(transformerId: string): Promise<ThermalImage[]> {

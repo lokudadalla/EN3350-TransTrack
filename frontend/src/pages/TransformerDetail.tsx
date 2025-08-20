@@ -60,11 +60,11 @@ export default function TransformerDetail() {
       </div>
 
       <h3>Transformer: {id}</h3>
-      {t && (
+        {t && (
         <p>
-          Location: {t.location} · Capacity: {t.capacity}
+            Region: {t.region} · Type: {t.type} · Pole No: {t.poleNo}
         </p>
-      )}
+        )}
 
       <h4 style={{ marginTop: 16 }}>Upload Image</h4>
       <form
