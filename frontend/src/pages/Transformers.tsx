@@ -11,12 +11,14 @@ import { REGIONS_SL } from "../constants/regions";
 import Modal from "../components/Modal";
 
 type EditState = {
-  id: string;
+  id: string;              // Transformer No
   region: string;
   poleNo: string;
   type: TransformerKind;
   locationDetails: string;
 };
+
+type SearchField = "id" | "poleNo";
 
 export default function Transformers() {
   const navigate = useNavigate();
@@ -26,7 +28,7 @@ export default function Transformers() {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Add form (used in modal)
+  // ------- Add (modal) -------
   const initialForm: EditState = {
     id: "",
     region: "",
@@ -37,8 +39,14 @@ export default function Transformers() {
   const [form, setForm] = useState<EditState>(initialForm);
   const [openAdd, setOpenAdd] = useState(false);
 
-  // Delete confirmation
+  // ------- Delete confirm (modal) -------
   const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  // ------- Filters / Search -------
+  const [searchField, setSearchField] = useState<SearchField>("id");
+  const [searchText, setSearchText] = useState("");
+  const [regionFilter, setRegionFilter] = useState<string>("__all");
+  const [typeFilter, setTypeFilter] = useState<"__all" | TransformerKind>("__all");
 
   const ids = useMemo(() => new Set(items.map((i) => i.id)), [items]);
 
@@ -59,6 +67,41 @@ export default function Transformers() {
     refresh();
   }, []);
 
+  // --------- Client-side filtering ----------
+  const filtered = useMemo(() => {
+    let list = items;
+
+    // text search
+    const q = searchText.trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) => {
+        const value =
+          searchField === "id" ? t.id ?? "" : (t.poleNo ?? "");
+        return value.toLowerCase().includes(q);
+      });
+    }
+
+    // region
+    if (regionFilter !== "__all") {
+      list = list.filter((t) => (t.region ?? "") === regionFilter);
+    }
+
+    // type
+    if (typeFilter !== "__all") {
+      list = list.filter((t) => (t.type as TransformerKind) === typeFilter);
+    }
+
+    return list;
+  }, [items, searchText, searchField, regionFilter, typeFilter]);
+
+  function resetFilters() {
+    setSearchField("id");
+    setSearchText("");
+    setRegionFilter("__all");
+    setTypeFilter("__all");
+  }
+
+  // --------- Validation ----------
   function validate(t: EditState) {
     if (!t.region.trim()) return "Region is required.";
     if (!t.id.trim()) return "Transformer No is required.";
@@ -67,6 +110,7 @@ export default function Transformers() {
     return null;
   }
 
+  // --------- CRUD ----------
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     const err = validate(form);
@@ -100,7 +144,7 @@ export default function Transformers() {
     }
   }
 
-  // Inline edit state
+  // Inline edit
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
 
@@ -140,19 +184,119 @@ export default function Transformers() {
   }
 
   function handleView(id: string) {
-    // Later you can swap this to open a custom detail modal.
     navigate(`/transformers/${id}`);
   }
 
+  // ------- tiny helpers for the filter bar look -------
+  const chip: React.CSSProperties = {
+    background: "#fff",
+    border: "1px solid #e8eef8",
+    borderRadius: 14,
+    padding: "8px 10px",
+  };
+  const bigInput: React.CSSProperties = {
+    ...chip,
+    height: 40,
+    outline: "none",
+    width: 260,
+  };
+  const selectStyle: React.CSSProperties = { ...chip, height: 40 };
+
   return (
     <div className="vstack" style={{ gap: 16 }}>
-      {/* header row with Add button */}
+      {/* H1 + Add */}
       <div className="hstack" style={{ justifyContent: "space-between" }}>
         <div className="section-title" style={{ fontSize: 22 }}>
           Transformers
         </div>
         <button className="btn-launch" onClick={() => setOpenAdd(true)}>
           Add Transformer
+        </button>
+      </div>
+
+      {/* --- Search / Filters row --- */}
+      <div
+        className="hstack"
+        style={{
+          gap: 10,
+          flexWrap: "wrap",
+          alignItems: "center",
+          marginTop: 2,
+        }}
+      >
+        {/* Search field selector */}
+        <select
+          value={searchField}
+          onChange={(e) => setSearchField(e.target.value as SearchField)}
+          style={{ ...selectStyle, width: 170 }}
+        >
+          <option value="id">By Transformer No</option>
+          <option value="poleNo">By Pole No</option>
+        </select>
+
+        {/* Search input */}
+        <input
+          style={bigInput}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          placeholder="Search transformer"
+        />
+
+        {/* Search button (no-op trigger, we filter live; this is for UX parity) */}
+        <button
+          aria-label="Search"
+          onClick={() => {/* live filtering already applied */}}
+          style={{
+            height: 40,
+            width: 40,
+            borderRadius: 12,
+            background: "#3f51b5",
+            color: "#fff",
+            border: 0,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+          title="Search"
+        >
+          🔍
+        </button>
+
+        {/* spacer */}
+        <div style={{ width: 12 }} />
+
+        {/* Region filter */}
+        <select
+          value={regionFilter}
+          onChange={(e) => setRegionFilter(e.target.value)}
+          style={{ ...selectStyle, width: 170 }}
+        >
+          <option value="__all">All Regions</option>
+          {REGIONS_SL.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+
+        {/* Type filter */}
+        <select
+          value={typeFilter}
+          onChange={(e) =>
+            setTypeFilter(e.target.value as "__all" | TransformerKind)
+          }
+          style={{ ...selectStyle, width: 140 }}
+        >
+          <option value="__all">All Types</option>
+          <option value="Distribution">Distribution</option>
+          <option value="Bulk">Bulk</option>
+        </select>
+
+        <button
+          onClick={resetFilters}
+          className="btn"
+          style={{ marginLeft: 6, fontWeight: 700, color: "#3949ab" }}
+        >
+          Reset Filters
         </button>
       </div>
 
@@ -177,14 +321,14 @@ export default function Transformers() {
               <tr>
                 <td colSpan={6}>Loading…</td>
               </tr>
-            ) : items.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="subtle">
                   No transformers yet.
                 </td>
               </tr>
             ) : (
-              items.map((t) => {
+              filtered.map((t) => {
                 const isEditing = editingId === t.id;
                 return (
                   <tr key={t.id}>
@@ -280,7 +424,6 @@ export default function Transformers() {
                         className="hstack"
                         style={{ justifyContent: "flex-end", gap: 8 }}
                       >
-                        {/* VIEW (purple/blue, longer text button) */}
                         {!isEditing && (
                           <button
                             onClick={() => handleView(t.id)}
@@ -298,7 +441,6 @@ export default function Transformers() {
                           </button>
                         )}
 
-                        {/* EDIT / SAVE / CANCEL */}
                         {isEditing ? (
                           <>
                             <button
@@ -318,7 +460,6 @@ export default function Transformers() {
                           </button>
                         )}
 
-                        {/* DELETE (short red icon button) */}
                         {!isEditing && (
                           <button
                             aria-label={`Delete ${t.id}`}
@@ -480,8 +621,7 @@ export default function Transformers() {
         }
       >
         <p>
-          Are you sure you want to delete transformer{" "}
-          <b>{confirmId}</b>?
+          Are you sure you want to delete transformer <b>{confirmId}</b>?
         </p>
       </Modal>
     </div>
