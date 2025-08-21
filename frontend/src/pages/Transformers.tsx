@@ -1,23 +1,25 @@
-// src/pages/Transformers.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Transformer, TransformerKind } from "../types";
 import {
-  listTransformers,
-  createTransformer,
-  deleteTransformer,
-  updateTransformer,
-} from "../services/api";
+  listTransformers as apiList,
+  createTransformer as apiCreate,
+  deleteTransformer as apiDelete,
+  updateTransformer as apiUpdate,
+} from "../api/transformers"; // <-- NEW API
 import { REGIONS_SL } from "../constants/regions";
 import Modal from "../components/Modal";
 
 type EditState = {
+  /** business id shown in UI = backend transformerNo */
   id: string;
   region: string;
   poleNo: string;
   type: TransformerKind;
   locationDetails: string;
   favorite?: boolean;
+  /** numeric DB id from backend when editing */
+  backendId?: number;
 };
 
 type SearchField = "id" | "poleNo";
@@ -45,8 +47,8 @@ export default function Transformers() {
   const [form, setForm] = useState<EditState>(initialForm);
   const [openAdd, setOpenAdd] = useState(false);
 
-  // Delete confirmation
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  // Delete confirmation (numeric backend id)
+  const [confirmBackendId, setConfirmBackendId] = useState<number | null>(null);
 
   // Inline edit
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export default function Transformers() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listTransformers();
+      const data = await apiList();
       data.sort((a, b) => a.id.localeCompare(b.id));
       setItems(data);
     } catch (e: any) {
@@ -96,29 +98,29 @@ export default function Transformers() {
     if (err) return alert(err);
     if (ids.has(form.id)) return alert("That Transformer No already exists.");
     try {
-      const payload: Transformer = {
+      const created = await apiCreate({
         id: form.id,
         region: form.region,
         poleNo: form.poleNo,
         type: form.type,
         locationDetails: form.locationDetails,
         favorite: !!form.favorite,
-      };
-      await createTransformer(payload);
+      });
+      // optimistic insert (keeps table position snappy)
+      setItems((prev) => [created, ...prev]);
       setForm(initialForm);
       setOpenAdd(false);
-      await refresh();
     } catch (e: any) {
       alert(e?.message ?? "Create failed");
     }
   }
 
   async function doDelete() {
-    if (!confirmId) return;
+    if (confirmBackendId == null) return;
     try {
-      await deleteTransformer(confirmId);
-      setConfirmId(null);
-      await refresh();
+      await apiDelete(confirmBackendId);
+      setItems((prev) => prev.filter((t) => t.backendId !== confirmBackendId));
+      setConfirmBackendId(null);
     } catch (e: any) {
       alert(e?.message ?? "Delete failed");
     }
@@ -127,6 +129,7 @@ export default function Transformers() {
   function startEdit(row: Transformer) {
     setEditingId(row.id);
     setEdit({
+      backendId: row.backendId, // keep numeric id for PUT
       id: row.id,
       region: row.region ?? "",
       poleNo: row.poleNo ?? "",
@@ -139,20 +142,24 @@ export default function Transformers() {
     setEditingId(null);
     setEdit(null);
   }
+
   async function saveEdit() {
     if (!edit) return;
+    if (edit.backendId == null) return alert("Missing backendId for update.");
     const err = validate(edit);
     if (err) return alert(err);
     setSaving(edit.id);
     try {
-      await updateTransformer(edit.id, {
+      const updated = await apiUpdate({
+        backendId: edit.backendId,
+        id: edit.id,
         region: edit.region,
         poleNo: edit.poleNo,
         type: edit.type,
         locationDetails: edit.locationDetails,
         favorite: !!edit.favorite,
       });
-      await refresh();
+      setItems((prev) => prev.map((t) => (t.backendId === updated.backendId ? updated : t)));
       cancelEdit();
     } catch (e: any) {
       alert(e?.message ?? "Update failed");
@@ -162,17 +169,14 @@ export default function Transformers() {
   }
 
   async function toggleFavorite(t: Transformer) {
-    // optimistic UI
-    setItems((old) =>
-      old.map((x) => (x.id === t.id ? { ...x, favorite: !x.favorite } : x))
-    );
+    // optimistic UI toggle
+    const draft = { ...t, favorite: !t.favorite };
+    setItems((old) => old.map((x) => (x.backendId === t.backendId ? draft : x)));
     try {
-      await updateTransformer(t.id, { favorite: !t.favorite });
-    } catch (e) {
-      // revert on error
-      setItems((old) =>
-        old.map((x) => (x.id === t.id ? { ...x, favorite: t.favorite } : x))
-      );
+      await apiUpdate(draft);
+    } catch {
+      // revert if failed
+      setItems((old) => old.map((x) => (x.backendId === t.backendId ? t : x)));
       alert("Failed to update favorite");
     }
   }
@@ -252,7 +256,6 @@ export default function Transformers() {
           padding: 12,
         }}
       >
-        {/* By ... */}
         <div className="hstack" style={{ gap: 8 }}>
           <select
             className="input"
@@ -273,17 +276,11 @@ export default function Transformers() {
             style={{ minWidth: 240 }}
           />
 
-          {/* Search icon: optional, filters are live anyway */}
-          <button
-            className="btn"
-            onClick={() => setPage(1)}
-            title="Apply search"
-          >
+          <button className="btn" onClick={() => setPage(1)} title="Apply search">
             🔍
           </button>
         </div>
 
-        {/* Favorites toggle */}
         <button
           className="btn"
           onClick={() => setFavOnly((v) => !v)}
@@ -297,7 +294,6 @@ export default function Transformers() {
           {favOnly ? "★" : "☆"}
         </button>
 
-        {/* Region */}
         <select
           className="input"
           value={regionFilter}
@@ -311,7 +307,6 @@ export default function Transformers() {
           ))}
         </select>
 
-        {/* Type */}
         <select
           className="input"
           value={typeFilter}
@@ -357,7 +352,7 @@ export default function Transformers() {
               pageData.map((t) => {
                 const isEditing = editingId === t.id;
                 return (
-                  <tr key={t.id}>
+                  <tr key={`${t.backendId}-${t.id}`}>
                     {/* Favorite star column */}
                     <td style={{ textAlign: "center" }}>
                       <button
@@ -449,10 +444,7 @@ export default function Transformers() {
                     </td>
 
                     <td>
-                      <div
-                        className="hstack"
-                        style={{ justifyContent: "flex-end", gap: 8 }}
-                      >
+                      <div className="hstack" style={{ justifyContent: "flex-end", gap: 8 }}>
                         {!isEditing && (
                           <button
                             onClick={() => handleView(t.id)}
@@ -492,7 +484,7 @@ export default function Transformers() {
                         {!isEditing && (
                           <button
                             aria-label={`Delete ${t.id}`}
-                            onClick={() => setConfirmId(t.id)}
+                            onClick={() => setConfirmBackendId(t.backendId!)}
                             style={{
                               background: "#dc2626",
                               color: "#fff",
@@ -648,9 +640,9 @@ export default function Transformers() {
 
       {/* Delete Confirmation Modal */}
       <Modal
-        open={confirmId !== null}
+        open={confirmBackendId !== null}
         title="Delete transformer"
-        onClose={() => setConfirmId(null)}
+        onClose={() => setConfirmBackendId(null)}
         footer={
           <>
             <button
@@ -667,15 +659,13 @@ export default function Transformers() {
             >
               Yes, delete
             </button>
-            <button className="btn-ghost" onClick={() => setConfirmId(null)}>
+            <button className="btn-ghost" onClick={() => setConfirmBackendId(null)}>
               No
             </button>
           </>
         }
       >
-        <p>
-          Are you sure you want to delete transformer <b>{confirmId}</b>?
-        </p>
+        <p>Are you sure you want to delete this transformer?</p>
       </Modal>
     </div>
   );
