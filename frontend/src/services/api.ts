@@ -1,40 +1,63 @@
+// src/services/api.ts
 import axios from "axios";
-import type { Transformer, ThermalImage, EnvCondition, ImageType } from "../types";
+import type {
+  Transformer,
+  ThermalImage,
+  EnvCondition,
+  ImageType,
+  TransformerKind,
+} from "../types";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
 });
 
-// Transformers
+// ---------- Transformers ----------
 export async function listTransformers(): Promise<Transformer[]> {
   const { data } = await api.get("/transformers");
   return data;
 }
+
 export async function createTransformer(t: Transformer): Promise<Transformer> {
   const { data } = await api.post("/transformers", t);
   return data as Transformer;
 }
+
 export async function deleteTransformer(id: string): Promise<void> {
   await api.delete(`/transformers/${id}`);
 }
+
 export async function getTransformer(id: string): Promise<Transformer> {
   const { data } = await api.get(`/transformers/${id}`);
   return data as Transformer;
 }
+
+/** Partial update */
 export async function updateTransformer(
   id: string,
-  patch: Partial<Transformer>
+  patch: Partial<{
+    region: string;
+    poleNo: string;
+    type: TransformerKind;
+    locationDetails: string;
+    favorite: boolean;
+  }>
 ): Promise<Transformer> {
-  // If your backend uses PATCH instead, change put -> patch
   const { data } = await api.put(`/transformers/${id}`, patch);
   return data as Transformer;
 }
 
-// Images
+/** Convenience for just favorite */
+export async function setFavorite(id: string, favorite: boolean) {
+  return updateTransformer(id, { favorite });
+}
+
+// ---------- Images ----------
 export async function listImages(transformerId: string): Promise<ThermalImage[]> {
   const { data } = await api.get(`/transformers/${transformerId}/images`);
   return data;
 }
+
 export async function uploadImage(params: {
   transformerId: string;
   file: File;
@@ -49,6 +72,7 @@ export async function uploadImage(params: {
     form.append("envCondition", params.envCondition);
   }
   form.append("uploader", params.uploader);
+
   const { data } = await api.post(
     `/transformers/${params.transformerId}/images`,
     form,

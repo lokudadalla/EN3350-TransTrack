@@ -1,3 +1,5 @@
+// src/types.ts
+
 export type TransformerKind = "Bulk" | "Distribution";
 
 export interface Transformer {
@@ -15,6 +17,9 @@ export interface Transformer {
 
   /** Free-text location details */
   locationDetails: string;
+
+  /** NEW: mark as favorite (blue star if true, outline if false/undefined) */
+  favorite?: boolean;
 
   /** Optional legacy fields (kept so older code doesn’t break) */
   capacity?: string;
