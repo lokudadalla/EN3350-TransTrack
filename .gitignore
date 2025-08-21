@@ -29,3 +29,5 @@ replay_pid*
 
 
 .vscode/
+
+/node_modules/
