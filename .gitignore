@@ -30,4 +30,4 @@ replay_pid*
 
 .vscode/
 
-/node_modules/
+/frontend/node_modules/
