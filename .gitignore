@@ -27,7 +27,6 @@ replay_pid*
 ### Environment ###
 .env
 
-
 .vscode/
 
 /node_modules/
