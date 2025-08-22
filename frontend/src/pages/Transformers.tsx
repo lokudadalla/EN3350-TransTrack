@@ -2,51 +2,67 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Transformer, TransformerKind } from "../types";
 import {
-  listTransformers,
-  createTransformer,
-  deleteTransformer,
-  updateTransformer,
-} from "../services/api";
+  listTransformers as apiList,
+  createTransformer as apiCreate,
+  deleteTransformer as apiDelete,
+  updateTransformer as apiUpdate,
+} from "../api/transformers"; // <-- NEW API
 import { REGIONS_SL } from "../constants/regions";
 import Modal from "../components/Modal";
 
 type EditState = {
-  id: string;              // Transformer No
+  /** business id shown in UI = backend transformerNo */
+  id: string;
   region: string;
   poleNo: string;
   type: TransformerKind;
   locationDetails: string;
+  favorite?: boolean;
+  /** numeric DB id from backend when editing */
+  backendId?: number;
 };
 
 type SearchField = "id" | "poleNo";
 
+const PAGE_SIZE = 10;
+
 export default function Transformers() {
   const navigate = useNavigate();
 
+  // Data
   const [items, setItems] = useState<Transformer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ------- Add (modal) -------
+  // Add modal
   const initialForm: EditState = {
     id: "",
     region: "",
     poleNo: "",
     type: "Distribution",
     locationDetails: "",
+    favorite: false,
   };
   const [form, setForm] = useState<EditState>(initialForm);
   const [openAdd, setOpenAdd] = useState(false);
 
-  // ------- Delete confirm (modal) -------
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  // Delete confirmation (numeric backend id)
+  const [confirmBackendId, setConfirmBackendId] = useState<number | null>(null);
 
-  // ------- Filters / Search -------
+  // Inline edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [edit, setEdit] = useState<EditState | null>(null);
+
+  // Filters
   const [searchField, setSearchField] = useState<SearchField>("id");
   const [searchText, setSearchText] = useState("");
-  const [regionFilter, setRegionFilter] = useState<string>("__all");
-  const [typeFilter, setTypeFilter] = useState<"__all" | TransformerKind>("__all");
+  const [favOnly, setFavOnly] = useState(false);
+  const [regionFilter, setRegionFilter] = useState<string>("All Regions");
+  const [typeFilter, setTypeFilter] = useState<"All Types" | TransformerKind>("All Types");
+
+  // Pagination
+  const [page, setPage] = useState(1);
 
   const ids = useMemo(() => new Set(items.map((i) => i.id)), [items]);
 
@@ -54,7 +70,7 @@ export default function Transformers() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listTransformers();
+      const data = await apiList();
       data.sort((a, b) => a.id.localeCompare(b.id));
       setItems(data);
     } catch (e: any) {
@@ -67,41 +83,7 @@ export default function Transformers() {
     refresh();
   }, []);
 
-  // --------- Client-side filtering ----------
-  const filtered = useMemo(() => {
-    let list = items;
-
-    // text search
-    const q = searchText.trim().toLowerCase();
-    if (q) {
-      list = list.filter((t) => {
-        const value =
-          searchField === "id" ? t.id ?? "" : (t.poleNo ?? "");
-        return value.toLowerCase().includes(q);
-      });
-    }
-
-    // region
-    if (regionFilter !== "__all") {
-      list = list.filter((t) => (t.region ?? "") === regionFilter);
-    }
-
-    // type
-    if (typeFilter !== "__all") {
-      list = list.filter((t) => (t.type as TransformerKind) === typeFilter);
-    }
-
-    return list;
-  }, [items, searchText, searchField, regionFilter, typeFilter]);
-
-  function resetFilters() {
-    setSearchField("id");
-    setSearchText("");
-    setRegionFilter("__all");
-    setTypeFilter("__all");
-  }
-
-  // --------- Validation ----------
+  // ---------- Validation / CRUD ----------
   function validate(t: EditState) {
     if (!t.region.trim()) return "Region is required.";
     if (!t.id.trim()) return "Transformer No is required.";
@@ -110,71 +92,74 @@ export default function Transformers() {
     return null;
   }
 
-  // --------- CRUD ----------
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     const err = validate(form);
     if (err) return alert(err);
     if (ids.has(form.id)) return alert("That Transformer No already exists.");
     try {
-      const payload: Transformer = {
+      const created = await apiCreate({
         id: form.id,
         region: form.region,
         poleNo: form.poleNo,
         type: form.type,
         locationDetails: form.locationDetails,
-      };
-      await createTransformer(payload);
+        favorite: !!form.favorite,
+      });
+      // optimistic insert (keeps table position snappy)
+      setItems((prev) => [created, ...prev]);
       setForm(initialForm);
       setOpenAdd(false);
-      await refresh();
     } catch (e: any) {
       alert(e?.message ?? "Create failed");
     }
   }
 
   async function doDelete() {
-    if (!confirmId) return;
+    if (confirmBackendId == null) return;
     try {
-      await deleteTransformer(confirmId);
-      setConfirmId(null);
-      await refresh();
+      await apiDelete(confirmBackendId);
+      setItems((prev) => prev.filter((t) => t.backendId !== confirmBackendId));
+      setConfirmBackendId(null);
     } catch (e: any) {
       alert(e?.message ?? "Delete failed");
     }
   }
 
-  // Inline edit
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [edit, setEdit] = useState<EditState | null>(null);
-
   function startEdit(row: Transformer) {
     setEditingId(row.id);
     setEdit({
+      backendId: row.backendId, // keep numeric id for PUT
       id: row.id,
       region: row.region ?? "",
       poleNo: row.poleNo ?? "",
       type: (row.type as TransformerKind) ?? "Distribution",
       locationDetails: row.locationDetails ?? "",
+      favorite: !!row.favorite,
     });
   }
   function cancelEdit() {
     setEditingId(null);
     setEdit(null);
   }
+
   async function saveEdit() {
     if (!edit) return;
+    if (edit.backendId == null) return alert("Missing backendId for update.");
     const err = validate(edit);
     if (err) return alert(err);
     setSaving(edit.id);
     try {
-      await updateTransformer(edit.id, {
+      const updated = await apiUpdate({
+        backendId: edit.backendId,
+        id: edit.id,
         region: edit.region,
         poleNo: edit.poleNo,
         type: edit.type,
         locationDetails: edit.locationDetails,
+        favorite: !!edit.favorite,
       });
-      await refresh();
+      setItems((prev) => prev.map((t) => (t.backendId === updated.backendId ? updated : t)));
       cancelEdit();
     } catch (e: any) {
       alert(e?.message ?? "Update failed");
@@ -183,28 +168,74 @@ export default function Transformers() {
     }
   }
 
+  async function toggleFavorite(t: Transformer) {
+    // optimistic UI toggle
+    const draft = { ...t, favorite: !t.favorite };
+    setItems((old) => old.map((x) => (x.backendId === t.backendId ? draft : x)));
+    try {
+      await apiUpdate(draft);
+    } catch {
+      // revert if failed
+      setItems((old) => old.map((x) => (x.backendId === t.backendId ? t : x)));
+      alert("Failed to update favorite");
+    }
+  }
+
   function handleView(id: string) {
     navigate(`/transformers/${id}`);
   }
 
-  // ------- tiny helpers for the filter bar look -------
-  const chip: React.CSSProperties = {
-    background: "#fff",
-    border: "1px solid #e8eef8",
-    borderRadius: 14,
-    padding: "8px 10px",
-  };
-  const bigInput: React.CSSProperties = {
-    ...chip,
-    height: 40,
-    outline: "none",
-    width: 260,
-  };
-  const selectStyle: React.CSSProperties = { ...chip, height: 40 };
+  // ---------- Filtering ----------
+  const filtered = useMemo(() => {
+    let data = items;
 
+    // text filter
+    const q = searchText.trim().toLowerCase();
+    if (q) {
+      data = data.filter((t) =>
+        (searchField === "id" ? t.id : t.poleNo).toLowerCase().includes(q)
+      );
+    }
+
+    // favorites
+    if (favOnly) data = data.filter((t) => !!t.favorite);
+
+    // region
+    if (regionFilter !== "All Regions") {
+      data = data.filter((t) => t.region === regionFilter);
+    }
+
+    // type
+    if (typeFilter !== "All Types") {
+      data = data.filter((t) => t.type === typeFilter);
+    }
+
+    return data;
+  }, [items, searchText, searchField, favOnly, regionFilter, typeFilter]);
+
+  // reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchText, searchField, favOnly, regionFilter, typeFilter]);
+
+  // ---------- Pagination ----------
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const start = (page - 1) * PAGE_SIZE;
+  const pageData = filtered.slice(start, start + PAGE_SIZE);
+
+  function resetFilters() {
+    setSearchField("id");
+    setSearchText("");
+    setFavOnly(false);
+    setRegionFilter("All Regions");
+    setTypeFilter("All Types");
+    setPage(1);
+  }
+
+  // ---------- UI ----------
   return (
     <div className="vstack" style={{ gap: 16 }}>
-      {/* H1 + Add */}
+      {/* title row & add button */}
       <div className="hstack" style={{ justifyContent: "space-between" }}>
         <div className="section-title" style={{ fontSize: 22 }}>
           Transformers
@@ -214,63 +245,61 @@ export default function Transformers() {
         </button>
       </div>
 
-      {/* --- Search / Filters row --- */}
+      {/* FILTER BAR */}
       <div
-        className="hstack"
+        className="card"
         style={{
+          display: "flex",
           gap: 10,
-          flexWrap: "wrap",
           alignItems: "center",
-          marginTop: 2,
+          flexWrap: "wrap",
+          padding: 12,
         }}
       >
-        {/* Search field selector */}
-        <select
-          value={searchField}
-          onChange={(e) => setSearchField(e.target.value as SearchField)}
-          style={{ ...selectStyle, width: 170 }}
-        >
-          <option value="id">By Transformer No</option>
-          <option value="poleNo">By Pole No</option>
-        </select>
+        <div className="hstack" style={{ gap: 8 }}>
+          <select
+            className="input"
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value as SearchField)}
+          >
+            <option value="id">By Transformer No</option>
+            <option value="poleNo">By Pole No</option>
+          </select>
 
-        {/* Search input */}
-        <input
-          style={bigInput}
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Search transformer"
-        />
+          <input
+            className="input"
+            placeholder={
+              searchField === "id" ? "Search transformer..." : "Search pole..."
+            }
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ minWidth: 240 }}
+          />
 
-        {/* Search button (no-op trigger, we filter live; this is for UX parity) */}
+          <button className="btn" onClick={() => setPage(1)} title="Apply search">
+            🔍
+          </button>
+        </div>
+
         <button
-          aria-label="Search"
-          onClick={() => {/* live filtering already applied */}}
+          className="btn"
+          onClick={() => setFavOnly((v) => !v)}
+          title={favOnly ? "Show all" : "Show favorites"}
           style={{
-            height: 40,
-            width: 40,
-            borderRadius: 12,
-            background: "#3f51b5",
-            color: "#fff",
-            border: 0,
+            borderColor: favOnly ? "#3f51b5" : undefined,
+            color: favOnly ? "#3f51b5" : undefined,
             fontWeight: 700,
-            cursor: "pointer",
           }}
-          title="Search"
         >
-          🔍
+          {favOnly ? "★" : "☆"}
         </button>
 
-        {/* spacer */}
-        <div style={{ width: 12 }} />
-
-        {/* Region filter */}
         <select
+          className="input"
           value={regionFilter}
           onChange={(e) => setRegionFilter(e.target.value)}
-          style={{ ...selectStyle, width: 170 }}
         >
-          <option value="__all">All Regions</option>
+          <option>All Regions</option>
           {REGIONS_SL.map((r) => (
             <option key={r} value={r}>
               {r}
@@ -278,39 +307,31 @@ export default function Transformers() {
           ))}
         </select>
 
-        {/* Type filter */}
         <select
+          className="input"
           value={typeFilter}
-          onChange={(e) =>
-            setTypeFilter(e.target.value as "__all" | TransformerKind)
-          }
-          style={{ ...selectStyle, width: 140 }}
+          onChange={(e) => setTypeFilter(e.target.value as any)}
         >
-          <option value="__all">All Types</option>
+          <option>All Types</option>
           <option value="Distribution">Distribution</option>
           <option value="Bulk">Bulk</option>
         </select>
 
-        <button
-          onClick={resetFilters}
-          className="btn"
-          style={{ marginLeft: 6, fontWeight: 700, color: "#3949ab" }}
-        >
+        <button className="btn" onClick={resetFilters}>
           Reset Filters
         </button>
       </div>
 
-      {/* Table Card */}
+      {/* TABLE */}
       <div className="card">
-        {error && (
-          <p style={{ color: "#dc2626", marginBottom: 8 }}>{error}</p>
-        )}
+        {error && <p style={{ color: "#dc2626", marginBottom: 8 }}>{error}</p>}
         <table className="table">
           <thead>
             <tr>
+              <th style={{ width: 48 }}></th>
               <th>Transformer No</th>
-              <th>Region</th>
               <th>Pole No</th>
+              <th>Region</th>
               <th>Type</th>
               <th>Location Details</th>
               <th style={{ textAlign: "right" }}>Actions</th>
@@ -319,20 +340,52 @@ export default function Transformers() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6}>Loading…</td>
+                <td colSpan={7}>Loading…</td>
               </tr>
-            ) : filtered.length === 0 ? (
+            ) : pageData.length === 0 ? (
               <tr>
-                <td colSpan={6} className="subtle">
-                  No transformers yet.
+                <td colSpan={7} className="subtle">
+                  No transformers found.
                 </td>
               </tr>
             ) : (
-              filtered.map((t) => {
+              pageData.map((t) => {
                 const isEditing = editingId === t.id;
                 return (
-                  <tr key={t.id}>
+                  <tr key={`${t.backendId}-${t.id}`}>
+                    {/* Favorite star column */}
+                    <td style={{ textAlign: "center" }}>
+                      <button
+                        aria-label="toggle favorite"
+                        onClick={() => toggleFavorite(t)}
+                        title={t.favorite ? "Unfavorite" : "Favorite"}
+                        style={{
+                          background: "transparent",
+                          border: 0,
+                          fontSize: 18,
+                          cursor: "pointer",
+                          color: t.favorite ? "#3f51b5" : "#94a3b8",
+                        }}
+                      >
+                        {t.favorite ? "★" : "☆"}
+                      </button>
+                    </td>
+
                     <td style={{ fontWeight: 600 }}>{t.id}</td>
+
+                    <td>
+                      {isEditing ? (
+                        <input
+                          className="input"
+                          value={edit?.poleNo ?? ""}
+                          onChange={(e) =>
+                            setEdit((s) => (s ? { ...s, poleNo: e.target.value } : s))
+                          }
+                        />
+                      ) : (
+                        t.poleNo
+                      )}
+                    </td>
 
                     <td>
                       {isEditing ? (
@@ -340,9 +393,7 @@ export default function Transformers() {
                           className="input"
                           value={edit?.region ?? ""}
                           onChange={(e) =>
-                            setEdit((s) =>
-                              s ? { ...s, region: e.target.value } : s
-                            )
+                            setEdit((s) => (s ? { ...s, region: e.target.value } : s))
                           }
                         >
                           <option value="">Region</option>
@@ -359,34 +410,12 @@ export default function Transformers() {
 
                     <td>
                       {isEditing ? (
-                        <input
-                          className="input"
-                          value={edit?.poleNo ?? ""}
-                          onChange={(e) =>
-                            setEdit((s) =>
-                              s ? { ...s, poleNo: e.target.value } : s
-                            )
-                          }
-                        />
-                      ) : (
-                        t.poleNo
-                      )}
-                    </td>
-
-                    <td>
-                      {isEditing ? (
                         <select
                           className="input"
                           value={edit?.type ?? "Distribution"}
                           onChange={(e) =>
                             setEdit((s) =>
-                              s
-                                ? {
-                                    ...s,
-                                    type: e.target
-                                      .value as TransformerKind,
-                                  }
-                                : s
+                              s ? { ...s, type: e.target.value as TransformerKind } : s
                             )
                           }
                         >
@@ -405,12 +434,7 @@ export default function Transformers() {
                           value={edit?.locationDetails ?? ""}
                           onChange={(e) =>
                             setEdit((s) =>
-                              s
-                                ? {
-                                    ...s,
-                                    locationDetails: e.target.value,
-                                  }
-                                : s
+                              s ? { ...s, locationDetails: e.target.value } : s
                             )
                           }
                         />
@@ -420,10 +444,7 @@ export default function Transformers() {
                     </td>
 
                     <td>
-                      <div
-                        className="hstack"
-                        style={{ justifyContent: "flex-end", gap: 8 }}
-                      >
+                      <div className="hstack" style={{ justifyContent: "flex-end", gap: 8 }}>
                         {!isEditing && (
                           <button
                             onClick={() => handleView(t.id)}
@@ -463,7 +484,7 @@ export default function Transformers() {
                         {!isEditing && (
                           <button
                             aria-label={`Delete ${t.id}`}
-                            onClick={() => setConfirmId(t.id)}
+                            onClick={() => setConfirmBackendId(t.backendId!)}
                             style={{
                               background: "#dc2626",
                               color: "#fff",
@@ -486,9 +507,41 @@ export default function Transformers() {
             )}
           </tbody>
         </table>
+
+        {/* Pagination */}
+        <div className="hstack" style={{ gap: 6, justifyContent: "center", marginTop: 12 }}>
+          <button className="btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+            ‹
+          </button>
+          {Array.from({ length: totalPages }).map((_, i) => {
+            const n = i + 1;
+            const active = n === page;
+            return (
+              <button
+                key={n}
+                className="btn"
+                onClick={() => setPage(n)}
+                style={{
+                  fontWeight: active ? 700 : 500,
+                  background: active ? "#3f51b5" : undefined,
+                  color: active ? "#fff" : undefined,
+                }}
+              >
+                {n}
+              </button>
+            );
+          })}
+          <button
+            className="btn"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            ›
+          </button>
+        </div>
       </div>
 
-      {/* Add Transformer Modal */}
+      {/* Add Modal */}
       <Modal
         open={openAdd}
         title="Add Transformer"
@@ -498,11 +551,7 @@ export default function Transformers() {
         }}
         footer={
           <>
-            <button
-              className="btn-cta"
-              form="add-transformer-form"
-              type="submit"
-            >
+            <button className="btn-cta" form="add-transformer-form" type="submit">
               Confirm
             </button>
             <button
@@ -517,12 +566,7 @@ export default function Transformers() {
           </>
         }
       >
-        <form
-          id="add-transformer-form"
-          onSubmit={onCreate}
-          className="vstack"
-          style={{ gap: 14 }}
-        >
+        <form id="add-transformer-form" onSubmit={onCreate} className="vstack" style={{ gap: 14 }}>
           <div className="vstack">
             <label className="subtle">Regions</label>
             <select
@@ -555,9 +599,7 @@ export default function Transformers() {
               className="input"
               placeholder="Pole No"
               value={form.poleNo}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, poleNo: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, poleNo: e.target.value }))}
             />
           </div>
 
@@ -566,12 +608,7 @@ export default function Transformers() {
             <select
               className="input"
               value={form.type}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  type: e.target.value as TransformerKind,
-                }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as TransformerKind }))}
             >
               <option value="Distribution">Distribution</option>
               <option value="Bulk">Bulk</option>
@@ -585,19 +622,27 @@ export default function Transformers() {
               rows={3}
               placeholder="Location Details"
               value={form.locationDetails}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, locationDetails: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, locationDetails: e.target.value }))}
             />
+          </div>
+
+          <div className="hstack" style={{ gap: 8, alignItems: "center" }}>
+            <input
+              id="fav"
+              type="checkbox"
+              checked={!!form.favorite}
+              onChange={(e) => setForm((f) => ({ ...f, favorite: e.target.checked }))}
+            />
+            <label htmlFor="fav">Mark as favorite</label>
           </div>
         </form>
       </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal
-        open={confirmId !== null}
+        open={confirmBackendId !== null}
         title="Delete transformer"
-        onClose={() => setConfirmId(null)}
+        onClose={() => setConfirmBackendId(null)}
         footer={
           <>
             <button
@@ -614,15 +659,13 @@ export default function Transformers() {
             >
               Yes, delete
             </button>
-            <button className="btn-ghost" onClick={() => setConfirmId(null)}>
+            <button className="btn-ghost" onClick={() => setConfirmBackendId(null)}>
               No
             </button>
           </>
         }
       >
-        <p>
-          Are you sure you want to delete transformer <b>{confirmId}</b>?
-        </p>
+        <p>Are you sure you want to delete this transformer?</p>
       </Modal>
     </div>
   );
