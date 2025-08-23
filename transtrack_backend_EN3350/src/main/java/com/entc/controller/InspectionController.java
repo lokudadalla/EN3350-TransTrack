@@ -32,8 +32,8 @@ public class InspectionController {
 
     // Get by transformer No.
     @GetMapping("/by-no")
-    public InspectionDetails getByTransformerNo(@RequestParam("no") String transformerNo) {
-        return inspectionService.getInspectionByTransformerNo(transformerNo);
+    public List<InspectionDetails> getByTransformerNo(@RequestParam("no") String transformerNo) {
+        return inspectionService.getAllInspectionByTransformerNo(transformerNo);
     }
 
     @GetMapping("/{id}")
