@@ -35,9 +35,9 @@ public class InspectionServiceImp implements InspectionService {
     }
 
     @Override
-    public InspectionDetails getInspectionByTransformerNo(String transformerNo) {
+    public List<InspectionDetails> getAllInspectionByTransformerNo(String transformerNo) {
 
-        InspectionDetails inspectionT = inspectionRepository.findInspectionByTransformerNo(transformerNo);
+        List<InspectionDetails> inspectionT = inspectionRepository.findAllByTransformerNo(transformerNo);
         if (inspectionT == null) throw new RuntimeException("Inspections not found for the Transformer No: " + transformerNo);
         return inspectionT;
     }

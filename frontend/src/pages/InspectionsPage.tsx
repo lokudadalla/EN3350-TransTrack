@@ -134,6 +134,9 @@ const InspectionsAPI = {
   listAll(): Promise<InspectionDTO[]> {
     return http<InspectionDTO[]>("/inspections");
   },
+  listByTransformerNo(no: string) {
+    return http<InspectionDTO[]>(`/inspections/by-no?no=${encodeURIComponent(no)}`);
+  },
   create(payload: Omit<InspectionDTO, "inspectionNo" | "createdAt">) {
     return http<InspectionDTO>("/inspections", {
       method: "POST",
@@ -144,6 +147,7 @@ const InspectionsAPI = {
     return http<InspectionDTO>(`/inspections/${id}`);
   },
 };
+
 
 // Mappers & formatters 
 function pad8(n: number | string) {
@@ -267,49 +271,56 @@ export default function InspectionsPage() {
   }, [transformerId]);
 
   //Load inspections from backend 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadInspections() {
-      if (!transformerId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const all = await InspectionsAPI.listAll();
-        const mine = all.filter((x) => x.transformerNo === transformerId);
-        mine.sort((a, b) => {
-          const at =
-            new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
-            new Date(a.createdAt).getTime();
-          const bt =
-            new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
-            new Date(b.createdAt).getTime();
-          return bt - at;
-        });
-        const rows = mine.map(mapDTOtoUI);
-        if (!cancelled) {
-          setInspections(rows);
-          setTransformer((t) => ({
-            ...t,
-            lastInspected: mine[0]
-              ? joinDateTime(mine[0].inspectionDate, mine[0].inspectionTime)
-              : "-",
-          }));
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setError(e?.message ?? "Failed to load inspections");
-          setInspections([]);
-          setTransformer((t) => ({ ...t, lastInspected: "-" }));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+useEffect(() => {
+  let cancelled = false;
+
+  async function loadInspections() {
+    if (!transformerId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // fetch only this transformer’s inspections
+      const mine = await InspectionsAPI.listByTransformerNo(transformerId);
+
+      // sort newest first
+      mine.sort((a, b) => {
+        const at =
+          new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
+          new Date(a.createdAt).getTime();
+        const bt =
+          new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
+          new Date(b.createdAt).getTime();
+        return bt - at;
+      });
+
+      const rows = mine.map(mapDTOtoUI);
+
+      if (!cancelled) {
+        setInspections(rows);
+        setTransformer((t) => ({
+          ...t,
+          lastInspected: mine[0]
+            ? joinDateTime(mine[0].inspectionDate, mine[0].inspectionTime)
+            : "-",
+        }));
       }
+    } catch (e: any) {
+      if (!cancelled) {
+        setError(e?.message ?? "Failed to load inspections");
+        setInspections([]);
+        setTransformer((t) => ({ ...t, lastInspected: "-" }));
+      }
+    } finally {
+      if (!cancelled) setLoading(false);
     }
-    loadInspections();
-    return () => {
-      cancelled = true;
-    };
-  }, [transformerId]);
+  }
+
+  loadInspections();
+  return () => {
+    cancelled = true;
+  };
+}, [transformerId]);
+
 
   // baseline handlers 
   function onPickBaseline(e: React.ChangeEvent<HTMLInputElement>) {
