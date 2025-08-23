@@ -34,6 +34,10 @@ public class InspectionImage {
     @Column(name = "uploaded_by", nullable = false, length = 100)
     private String uploader;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "env_condition")              // nullable for MAINTENANCE rows
+    private EnvironmentCondition condition;
+
     @Column(nullable = false)
     private String contentType;  // image/jpeg, image/png
 
