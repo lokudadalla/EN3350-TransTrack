@@ -1,6 +1,6 @@
 package com.entc.service;
 
-import com.entc.model.ImageType;
+import com.entc.dao.ImageType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;

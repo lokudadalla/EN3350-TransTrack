@@ -1,6 +1,5 @@
-package com.entc.model;
+package com.entc.dao;
 
-import com.entc.dao.InspectionDetails;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,7 +1,7 @@
 package com.entc.dto;
 
-import com.entc.model.ImageType;
-import com.entc.model.InspectionImage;
+import com.entc.dao.ImageType;
+import com.entc.dao.InspectionImage;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
