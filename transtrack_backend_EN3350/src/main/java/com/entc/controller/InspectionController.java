@@ -3,11 +3,10 @@ package com.entc.controller;
 import com.entc.dao.InspectionDetails;
 import com.entc.service.InspectionService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -20,6 +19,13 @@ public class InspectionController {
     @GetMapping
     List<InspectionDetails> getAllInspections() {
         return inspectionService.getAllInspections();
+    }
+
+    @PostMapping
+    public ResponseEntity<InspectionDetails> create(@RequestBody InspectionDetails body) {
+        InspectionDetails created = inspectionService.create(body);
+        URI location = URI.create("/inspections/" + created.getInspectionNo());
+        return ResponseEntity.created(location).body(created);
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,7 @@
 package com.entc.dao;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -29,9 +31,12 @@ public class InspectionDetails {
     @Column(name = "status")
     private String status;
 
+    @Schema(type = "string", format = "date", example = "2025-08-23")
     @Column(name = "inspection_date")
     private LocalDate inspectionDate;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm:ss")
+    @Schema(type = "string", example = "09:30:00")
     @Column(name = "inspection_time")
     private LocalTime inspectionTime;
 

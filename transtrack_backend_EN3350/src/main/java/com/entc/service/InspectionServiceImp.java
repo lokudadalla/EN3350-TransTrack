@@ -25,4 +25,11 @@ public class InspectionServiceImp implements InspectionService {
     public InspectionDetails getById(Long id) {
         return inspectionRepository.findById(id).orElseThrow(()-> new RuntimeException("Transfomer not found for the Transfomer No."+ id));
     }
+
+    @Override
+    public InspectionDetails create(InspectionDetails toCreate) {
+        // Ensure client cannot force an ID
+        toCreate.setInspectionNo(null);
+        return inspectionRepository.save(toCreate);
+    }
 }
