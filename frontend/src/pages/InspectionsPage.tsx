@@ -1,7 +1,8 @@
-// src/pages/InspectionsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { getTransformerByNo } from "../api/transformers"; 
 
+// Types 
 type Status = "Completed" | "In Progress" | "Pending";
 
 interface Inspection {
@@ -13,14 +14,15 @@ interface Inspection {
 }
 
 interface TransformerMeta {
-  id: string;
+  id: string;                  // Transformer No 
   poleNo: string;
   type: "Bulk" | "Distribution";
-  region: string; 
-  location: string;
+  region: string;
+  location: string;            
   lastInspected: string;
 }
 
+// UI tokens
 const ui = {
   bg: "#f6f8fb",
   card: "#ffffff",
@@ -106,7 +108,7 @@ const actionIconBtn: React.CSSProperties = {
   boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
 };
 
-/* ----------------- Backend DTO + client ----------------- */
+//  Inspections backend client 
 type InspectionDTO = {
   inspectionNo: number;
   transformerNo: string;
@@ -117,7 +119,7 @@ type InspectionDTO = {
   createdAt: string;       // ISO
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? ""; 
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -138,13 +140,12 @@ const InspectionsAPI = {
       body: JSON.stringify(payload),
     });
   },
-  
   getById(id: number) {
     return http<InspectionDTO>(`/inspections/${id}`);
   },
 };
 
-/* ----------------- Mappers & formatters ----------------- */
+// Mappers & formatters 
 function pad8(n: number | string) {
   const num = typeof n === "string" ? Number(n) : n;
   return String(num).padStart(8, "0");
@@ -171,10 +172,8 @@ function mapDTOtoUI(d: InspectionDTO): Inspection {
   };
 }
 
-/** Parse "Mon(21), May, 2023" -> "2023-05-21"  */
 function parseDisplayDateToISO(s: string): string {
   try {
-    // Match: Mon(21), May, 2023  OR Tue(02), June, 2025
     const m = s.match(/^[A-Za-z]{3}\((\d{1,2})\),\s*([A-Za-z]+),\s*(\d{4})/);
     if (!m) throw new Error("no match");
     const day = m[1].padStart(2, "0");
@@ -192,7 +191,6 @@ function parseDisplayDateToISO(s: string): string {
   }
 }
 
-
 function parseDisplayTimeToHHMMSS(s: string): string {
   try {
     const t = s.trim().toLowerCase();
@@ -205,12 +203,11 @@ function parseDisplayTimeToHHMMSS(s: string): string {
     if (ampm === "am" && h === 12) h = 0;
     return `${String(h).padStart(2, "0")}:${min}:00`;
   } catch {
-    // fallback 07:00
     return "07:00:00";
   }
 }
 
-/* ----------------- Component ----------------- */
+// Component
 export default function InspectionsPage() {
   const navigate = useNavigate();
   const { transformerId } = useParams<{ transformerId: string }>();
@@ -220,30 +217,59 @@ export default function InspectionsPage() {
   const [baselineUrl, setBaselineUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // simple modal state 
+  // modal state
   const [openModal, setOpenModal] = useState(false);
   const [branch, setBranch] = useState("Nugegoda");
   const [dateStr, setDateStr] = useState("Mon(21), May, 2023");
   const [timeStr, setTimeStr] = useState("7.00am");
 
-  // transformer's display meta 
   const baseTransformer: TransformerMeta = useMemo(
     () => ({
       id: transformerId ?? "TX-1001",
-      poleNo: "EN-122-A",
-      type: "Bulk",
-      region: "Nugegoda",
-      location: `"Keels", Embuldeniya`,
+      poleNo: "",
+      type: "Distribution",
+      region: "",
+      location: "",
       lastInspected: "-",
     }),
     [transformerId]
   );
   const [transformer, setTransformer] = useState<TransformerMeta>(baseTransformer);
 
-  // load from backend 
+
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    async function loadTransformer() {
+      if (!transformerId) return;
+      try {
+        const t = await getTransformerByNo(transformerId); 
+        if (!cancelled) {
+          setTransformer((prev) => ({
+            ...prev,
+            id: t.id, 
+            poleNo: t.poleNo,
+            type: t.type,
+            region: t.region,
+            location: t.locationDetails, 
+          }));
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          
+          setError((old) => old ?? "Failed to load transformer details");
+        }
+      }
+    }
+    loadTransformer();
+    return () => {
+      cancelled = true;
+    };
+  }, [transformerId]);
+
+  //Load inspections from backend 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadInspections() {
       if (!transformerId) return;
       setLoading(true);
       setError(null);
@@ -251,11 +277,13 @@ export default function InspectionsPage() {
         const all = await InspectionsAPI.listAll();
         const mine = all.filter((x) => x.transformerNo === transformerId);
         mine.sort((a, b) => {
-          const at = new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime()
-            || new Date(a.createdAt).getTime();
-          const bt = new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime()
-            || new Date(b.createdAt).getTime();
-          return bt - at; 
+          const at =
+            new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
+            new Date(a.createdAt).getTime();
+          const bt =
+            new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
+            new Date(b.createdAt).getTime();
+          return bt - at;
         });
         const rows = mine.map(mapDTOtoUI);
         if (!cancelled) {
@@ -277,8 +305,10 @@ export default function InspectionsPage() {
         if (!cancelled) setLoading(false);
       }
     }
-    load();
-    return () => { cancelled = true; };
+    loadInspections();
+    return () => {
+      cancelled = true;
+    };
   }, [transformerId]);
 
   // baseline handlers 
@@ -297,7 +327,7 @@ export default function InspectionsPage() {
     setBaselineUrl(null);
   }
 
-  // add inspection
+  // add inspection 
   async function addInspection(e: React.FormEvent) {
     e.preventDefault();
     if (!transformerId) return;
@@ -325,6 +355,7 @@ export default function InspectionsPage() {
     }
   }
 
+  // navigation 
   function goDetail(row: Inspection) {
     navigate(`/transformers/${transformer.id}/inspections/${row.inspectionNo}`, {
       state: {
@@ -339,6 +370,7 @@ export default function InspectionsPage() {
     else navigate("/transformers");
   }
 
+  // Render 
   return (
     <div style={{ background: ui.bg }}>
       {/* HEADER CARD */}
@@ -352,7 +384,7 @@ export default function InspectionsPage() {
           boxShadow: ui.shadow,
         }}
       >
-        {/* Top line: Back + Transformer ID on the left, Last inspected + Baseline on the right */}
+        {/* Top line */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           {/* Left cluster */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
@@ -376,13 +408,11 @@ export default function InspectionsPage() {
               ←
             </button>
             <div style={{ minWidth: 0 }}>
-              {/* Big transformer number */}
               <div style={{ fontSize: 26, fontWeight: 900, color: ui.text, lineHeight: 1.2 }}>
                 {transformer.id}
               </div>
-              {/* Region + location (small line) */}
               <div style={{ color: ui.sub, fontWeight: 700, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {transformer.region} <span style={{ marginLeft: 8 }}>📍 {transformer.location}</span>
+                {transformer.region || "—"} <span style={{ marginLeft: 8 }}>📍 {transformer.location || "—"}</span>
               </div>
             </div>
           </div>
@@ -393,7 +423,7 @@ export default function InspectionsPage() {
               <span style={{ color: ui.text }}>Last Inspected Date:</span> {transformer.lastInspected}
             </div>
 
-            {/* Baseline pill (label left, icons right) */}
+            {/* Baseline pill */}
             <div
               style={{
                 display: "flex",
@@ -416,8 +446,6 @@ export default function InspectionsPage() {
                 onChange={onPickBaseline}
                 style={{ display: "none" }}
               />
-
-              {/* left: emoji + text */}
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span
                   style={{
@@ -434,11 +462,7 @@ export default function InspectionsPage() {
                 </span>
                 <span style={{ fontWeight: 900, color: "#111827" }}>Baseline Image</span>
               </div>
-
-              {/* spacer pushes icons to the right */}
               <div style={{ flex: 1 }} />
-
-              {/* right: view + delete */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button
                   title="View"
@@ -477,9 +501,9 @@ export default function InspectionsPage() {
           </div>
         </div>
 
-        {/* Chips row */}
+        {/* Chips row — Pole No & Type */}
         <div style={{ display: "flex", gap: 14, marginTop: 16, alignItems: "stretch", flexWrap: "wrap" }}>
-          <Chip title="Pole No" value={transformer.poleNo} />
+          <Chip title="Pole No" value={transformer.poleNo || "—"} />
           <Chip title="Type" value={transformer.type} />
         </div>
 
@@ -600,7 +624,7 @@ export default function InspectionsPage() {
         </table>
       </div>
 
-      {/* Modal */}
+      {/* Modal*/}
       {openModal && (
         <div
           role="dialog"
@@ -721,7 +745,7 @@ export default function InspectionsPage() {
   );
 }
 
-/*  little chip component */
+// little chip component
 function Chip({ title, value }: { title: string; value: string }) {
   return (
     <div style={chip}>
