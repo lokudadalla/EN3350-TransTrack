@@ -31,6 +31,9 @@ public class InspectionImage {
     @Column(nullable = false)
     private String storagePath;  // absolute or relative disk path
 
+    @Column(name = "uploaded_by", nullable = false, length = 100)
+    private String uploader;
+
     @Column(nullable = false)
     private String contentType;  // image/jpeg, image/png
 

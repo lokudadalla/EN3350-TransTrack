@@ -26,9 +26,11 @@ public class InspectionImageService {
     private final StorageService storage;
 
     @Transactional
-    public List<InspectionImage> upload(Long inspectionId, ImageType type, List<MultipartFile> files) throws IOException {
+    public List<InspectionImage> upload(Long inspectionId, ImageType type, String uploader, List<MultipartFile> files) throws IOException {
         InspectionDetails inspection = inspectionRepo.findById(inspectionId)
                 .orElseThrow(() -> new IOException("Inspection not found: " + inspectionId));
+
+        String uploaderSafe = (uploader == null || uploader.isBlank()) ? "unknown" : uploader.trim();
 
         List<InspectionImage> saved = new ArrayList<>();
         for (MultipartFile f : files) {
@@ -46,6 +48,7 @@ public class InspectionImageService {
             img.setContentType(stored.getContentType());
             img.setSize(stored.getSize());
             img.setUploadedAt(LocalDateTime.now());
+            img.setUploader(uploaderSafe);
             saved.add(imageRepo.save(img));
         }
         return saved;

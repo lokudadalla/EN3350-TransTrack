@@ -17,9 +17,10 @@ public class InspectionImageDto {
     private long size;
     private LocalDateTime uploadedAt;
     private String url;
+    private String uploader;
 
     public static InspectionImageDto from(InspectionImage i) {
         String url = "/inspections/%d/images/%d/file".formatted(i.getInspection().getInspectionNo(), i.getId());
-        return new InspectionImageDto(i.getId(), i.getType(), i.getFileName(), i.getContentType(), i.getSize(), i.getUploadedAt(), url);
+        return new InspectionImageDto(i.getId(), i.getType(), i.getFileName(), i.getContentType(), i.getSize(), i.getUploadedAt(), url, i.getUploader());
     }
 }

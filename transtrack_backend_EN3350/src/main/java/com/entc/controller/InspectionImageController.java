@@ -29,9 +29,10 @@ public class InspectionImageController {
     public List<InspectionImageDto> upload(
             @PathVariable Long inspectionId,
             @RequestParam ImageType type,
+            @RequestParam String uploader,
             @RequestPart("files") List<MultipartFile> files
     ) throws IOException {
-        return imageService.upload(inspectionId, type, files).stream().map(InspectionImageDto::from).toList();
+        return imageService.upload(inspectionId, type, uploader, files).stream().map(InspectionImageDto::from).toList();
     }
 
     // GET /inspections/{id}/images[?type=MAINTENANCE]
