@@ -4,18 +4,14 @@ export interface Transformer {
   /** Business id shown in UI = backend "transformerNo" */
   id: string;
 
-  /** Numeric DB id from backend (used for PUT/DELETE) */
+  /** Numeric DB id from backend */
   backendId?: number;
 
   region: string;
   poleNo: string;
   type: TransformerKind;
   locationDetails: string;
-
-  /** New: favorite flag */
   favorite: boolean;
-
-  /** Optional legacy fields kept for compatibility */
   capacity?: string;
   location?: string;
 }
