@@ -1,5 +1,6 @@
 package com.entc.controller;
 
+import com.entc.dao.EnvironmentCondition;
 import com.entc.dto.InspectionImageDto;
 import com.entc.dao.ImageType;
 import com.entc.service.InspectionImageService;
@@ -29,9 +30,12 @@ public class InspectionImageController {
     public List<InspectionImageDto> upload(
             @PathVariable Long inspectionId,
             @RequestParam ImageType type,
+            @RequestParam String uploader,
+            @RequestParam(required = false) EnvironmentCondition condition,   // <-- new
             @RequestPart("files") List<MultipartFile> files
     ) throws IOException {
-        return imageService.upload(inspectionId, type, files).stream().map(InspectionImageDto::from).toList();
+        return imageService.upload(inspectionId, type, uploader, condition, files)
+                .stream().map(InspectionImageDto::from).toList();
     }
 
     // GET /inspections/{id}/images[?type=MAINTENANCE]

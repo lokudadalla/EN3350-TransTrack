@@ -1,5 +1,6 @@
 package com.entc.service;
 
+import com.entc.dao.EnvironmentCondition;
 import com.entc.dao.InspectionDetails;
 import com.entc.dao.ImageType;
 import com.entc.dao.InspectionImage;
@@ -26,9 +27,19 @@ public class InspectionImageService {
     private final StorageService storage;
 
     @Transactional
-    public List<InspectionImage> upload(Long inspectionId, ImageType type, List<MultipartFile> files) throws IOException {
-        InspectionDetails inspection = inspectionRepo.findById(inspectionId)
+    public List<InspectionImage> upload(Long inspectionId,
+                                        ImageType type,
+                                        String uploader,
+                                        @org.springframework.lang.Nullable EnvironmentCondition condition,
+                                        List<MultipartFile> files) throws IOException {
+        var inspection = inspectionRepo.findById(inspectionId)
                 .orElseThrow(() -> new IOException("Inspection not found: " + inspectionId));
+
+        if (type == ImageType.BASELINE && condition == null) {
+            throw new IOException("condition is required for BASELINE images (SUNNY/CLOUDY/RAINY).");
+        }
+
+        String uploaderSafe = (uploader == null || uploader.isBlank()) ? "unknown" : uploader.trim();
 
         List<InspectionImage> saved = new ArrayList<>();
         for (MultipartFile f : files) {
@@ -38,14 +49,16 @@ public class InspectionImageService {
 
             var stored = storage.store(f, inspectionId, type);
 
-            InspectionImage img = new InspectionImage();
+            var img = new InspectionImage();
             img.setInspection(inspection);
             img.setType(type);
             img.setFileName(stored.getFileName());
             img.setStoragePath(stored.getStoragePath());
-            img.setContentType(stored.getContentType());
+            img.setContentType(ct);
             img.setSize(stored.getSize());
             img.setUploadedAt(LocalDateTime.now());
+            img.setUploader(uploaderSafe);
+            img.setCondition(type == ImageType.BASELINE ? condition : null);  // <-- save it
             saved.add(imageRepo.save(img));
         }
         return saved;
