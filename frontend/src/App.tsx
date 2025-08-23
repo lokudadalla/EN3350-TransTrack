@@ -1,8 +1,8 @@
-// src/App.tsx
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import Transformers from "./pages/Transformers";
 import TransformerDetail from "./pages/TransformerDetail";
-import Inspections from "./pages/Inspections";
+import InspectionsPage from "./pages/InspectionsPage"; 
+import InspectionDetail from "./pages/InspectionDetail"; 
 import Profile from "./pages/Profile";
 import SegmentTabs from "./components/SegmentTabs";
 import UserMenu from "./components/UserMenu";
@@ -54,13 +54,13 @@ export default function App() {
           </div>
         </div>
 
-        {/* User menu (replaces the old Transformers link) */}
+        {/* User menu ) */}
         <UserMenu
           user={{
             name: "Trans Track",
             email: "transtrack@gmail.com",
             avatarUrl:
-              "https://i.pravatar.cc/64?img=12", // placeholder avatar
+              "https://i.pravatar.cc/64?img=12", 
           }}
           onNavigateProfile={() => navigate("/profile")}
           onSignOut={() => alert("Sign out: plug your auth here")}
@@ -84,7 +84,8 @@ export default function App() {
           <Route path="/" element={<Transformers />} />
           <Route path="/transformers" element={<Transformers />} />
           <Route path="/transformers/:id" element={<TransformerDetail />} />
-          <Route path="/inspections" element={<Inspections />} />
+          <Route path="/transformers/:transformerId/inspections" element={<InspectionsPage />} /> {/* Updated route */}
+          <Route path="/transformers/:transformerId/inspections/:inspectionNo" element={<InspectionDetail />} /> {/* ✅ New detail route */}
           <Route path="/profile" element={<Profile />} />
         </Routes>
 
