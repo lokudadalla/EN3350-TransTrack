@@ -1,3 +1,3 @@
-package com.entc.model;
+package com.entc.dao;
 
 public enum ImageType { BASELINE, MAINTENANCE }

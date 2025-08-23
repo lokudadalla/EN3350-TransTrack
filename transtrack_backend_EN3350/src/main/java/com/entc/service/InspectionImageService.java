@@ -1,8 +1,8 @@
 package com.entc.service;
 
 import com.entc.dao.InspectionDetails;
-import com.entc.model.ImageType;
-import com.entc.model.InspectionImage;
+import com.entc.dao.ImageType;
+import com.entc.dao.InspectionImage;
 import com.entc.repository.InspectionImageRepository;
 import com.entc.repository.InspectionRepository;
 import lombok.RequiredArgsConstructor;

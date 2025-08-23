@@ -1,7 +1,7 @@
 package com.entc.controller;
 
 import com.entc.dto.InspectionImageDto;
-import com.entc.model.ImageType;
+import com.entc.dao.ImageType;
 import com.entc.service.InspectionImageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;

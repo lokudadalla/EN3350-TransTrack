@@ -1,6 +1,6 @@
 package com.entc.service;
 
-import com.entc.model.ImageType;
+import com.entc.dao.ImageType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.core.io.Resource;

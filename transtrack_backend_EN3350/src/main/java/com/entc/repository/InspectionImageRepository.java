@@ -1,7 +1,7 @@
 package com.entc.repository;
 
-import com.entc.model.ImageType;
-import com.entc.model.InspectionImage;
+import com.entc.dao.ImageType;
+import com.entc.dao.InspectionImage;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
