@@ -8,5 +8,6 @@ public interface TransformerService {
     TransformerDetails getById(Long id);
     TransformerDetails getByTransformerNo(String transformerNo);
     List<TransformerDetails> getAll();
+	TransformerDetails update(Long id, TransformerDetails body);
     void delete(Long id);
 }

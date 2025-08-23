@@ -1,22 +1,21 @@
 export type TransformerKind = "Bulk" | "Distribution";
 
 export interface Transformer {
-  /** Transformer No (primary ID) */
+  /** Business id shown in UI = backend "transformerNo" */
   id: string;
 
-  /** Administrative region/town */
+  /** Numeric DB id from backend (used for PUT/DELETE) */
+  backendId?: number;
+
   region: string;
-
-  /** Pole No (string because some providers use mixed formats) */
   poleNo: string;
-
-  /** Transformer type */
   type: TransformerKind;
-
-  /** Free-text location details */
   locationDetails: string;
 
-  /** Optional legacy fields (kept so older code doesn’t break) */
+  /** New: favorite flag */
+  favorite: boolean;
+
+  /** Optional legacy fields kept for compatibility */
   capacity?: string;
   location?: string;
 }

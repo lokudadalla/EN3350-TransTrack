@@ -100,7 +100,37 @@ public class TransformerController {
     public TransformerDetails getByTransformerNo(@RequestParam("no") String transformerNo) {
         return service.getByTransformerNo(transformerNo);
     }
+    
+    // Edit existing transformer data
+    @PutMapping("/{id}")
+    public ResponseEntity<?> editById(@PathVariable Long id, @RequestBody TransformerDetails body) {
+        if (body == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Request body is required"
+            ));
+        }
+        if (body.getTransformerNo() == null || body.getTransformerNo().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "transformerNo is required"
+            ));
+        }
 
+        try {
+            TransformerDetails updated = service.update(id, body);
+
+            if (updated == null) {
+                return ResponseEntity.notFound().build(); // transformer with given ID not found
+            }
+
+            return ResponseEntity.ok(updated);
+
+        } catch (Exception ex) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "message", "Failed to update transformer",
+                    "detail", ex.getMessage()
+            ));
+        }
+    }																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																   
     // Delete
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

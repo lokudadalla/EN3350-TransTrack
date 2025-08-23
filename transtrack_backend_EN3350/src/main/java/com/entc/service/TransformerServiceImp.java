@@ -47,6 +47,28 @@ public class TransformerServiceImp implements TransformerService{
 		System.out.println("results"+ transformerRepo.findAll());
 		return transformerRepo.findAll();
 	}
+	
+	@Override
+	public TransformerDetails update(Long id, TransformerDetails body) {
+        return transformerRepo.findById(id).map(existing -> {
+        	if (body.getPoleNo() != null) {
+        		existing.setPoleNo(body.getPoleNo());
+        	}
+        	if (body.getRegion() != null) {
+        		existing.setRegion(body.getRegion());
+        	}
+        	if (body.getType() != null) {
+        		existing.setType(body.getType());
+        	}
+        	if (body.getLocationDetails() != null) {
+        		existing.setLocationDetails(body.getLocationDetails());
+        	}
+        	if (body.getFavorite() != null) {
+        		existing.setFavorite(body.getFavorite() != null ? body.getFavorite() : false);
+        	}   
+            return transformerRepo.save(existing);
+        }).orElse(null);
+    }
 
 	@Override
 	public void delete(Long id) {

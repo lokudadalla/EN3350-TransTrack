@@ -26,3 +26,10 @@ replay_pid*
 
 ### Environment ###
 .env
+
+.vscode/
+
+/node_modules/
+
+#new changes... (check fork)
+# check 2
