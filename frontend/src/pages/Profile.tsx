@@ -8,7 +8,7 @@ export default function Profile() {
 
   function save(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: connect to backend when ready
+  
     alert("Saved (mock): " + JSON.stringify({ name, email, role }, null, 2));
   }
 
