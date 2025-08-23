@@ -20,4 +20,9 @@ public class InspectionServiceImp implements InspectionService {
     public List<InspectionDetails> getAllInspections() {
         return inspectionRepository.findAll(); // temporary placeholder
     }
+
+    @Override
+    public InspectionDetails getById(Long id) {
+        return inspectionRepository.findById(id).orElseThrow(()-> new RuntimeException("Transfomer not found for the Transfomer No."+ id));
+    }
 }

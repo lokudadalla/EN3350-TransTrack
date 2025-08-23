@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface InspectionService {
     List<InspectionDetails> getAllInspections();
+    InspectionDetails getById(Long id);
 }
