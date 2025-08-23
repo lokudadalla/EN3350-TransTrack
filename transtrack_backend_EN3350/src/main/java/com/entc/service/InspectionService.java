@@ -8,4 +8,6 @@ public interface InspectionService {
     List<InspectionDetails> getAllInspections();
     InspectionDetails getById(Long id);
     InspectionDetails create(InspectionDetails toCreate);
+    InspectionDetails update(Long id, InspectionDetails toUpdate);
+    void delete(Long id);
 }

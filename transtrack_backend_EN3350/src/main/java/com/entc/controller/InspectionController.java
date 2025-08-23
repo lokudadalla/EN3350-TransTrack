@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("inspections")
@@ -31,5 +32,42 @@ public class InspectionController {
     @GetMapping("/{id}")
     public InspectionDetails getOne(@PathVariable Long id) {
         return inspectionService.getById(id);
+    }
+
+    // Edit existing inspection data
+    @PutMapping("/{id}")
+    public ResponseEntity<?> editById(@PathVariable Long id, @RequestBody InspectionDetails body) {
+        if (body == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Request body is required"
+            ));
+        }
+        if (body.getInspectionNo() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "inspectionNo is required"
+            ));
+        }
+
+        try {
+            InspectionDetails updated = inspectionService.update(id, body);
+
+            if (updated == null) {
+                return ResponseEntity.notFound().build(); // transformer with given ID not found
+            }
+
+            return ResponseEntity.ok(updated);
+
+        } catch (Exception ex) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "message", "Failed to update inspection",
+                    "detail", ex.getMessage()
+            ));
+        }
+    }
+    // Delete
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        inspectionService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

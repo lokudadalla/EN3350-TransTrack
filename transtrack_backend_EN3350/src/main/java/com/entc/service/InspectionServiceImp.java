@@ -1,6 +1,7 @@
 package com.entc.service;
 
 import com.entc.dao.InspectionDetails;
+import com.entc.dao.TransformerDetails;
 import com.entc.repository.InspectionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -31,5 +32,34 @@ public class InspectionServiceImp implements InspectionService {
         // Ensure client cannot force an ID
         toCreate.setInspectionNo(null);
         return inspectionRepository.save(toCreate);
+    }
+
+    @Override
+    public InspectionDetails update(Long id, InspectionDetails body) {
+        return inspectionRepository.findById(id).map(existing -> {
+            if (body.getTransformerNo() != null) {
+                existing.setTransformerNo(body.getTransformerNo());
+            }
+            if (body.getBranch() != null) {
+                existing.setBranch(body.getBranch());
+            }
+            if (body.getStatus() != null) {
+                existing.setStatus(body.getStatus());
+            }
+            if (body.getInspectionTime() != null) {
+                existing.setInspectionTime(body.getInspectionTime());
+            }
+            if (body.getInspectionDate() != null) {
+                existing.setInspectionDate(body.getInspectionDate());
+            }
+            return inspectionRepository.save(existing);
+        }).orElse(null);
+    }
+
+    @Override
+    public void delete(Long id) {
+
+        inspectionRepository.deleteById(id);
+
     }
 }
