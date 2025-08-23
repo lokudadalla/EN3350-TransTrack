@@ -1,4 +1,3 @@
-// src/api/inspections.ts
 export type InspectionDTO = {
     inspectionNo: number;          // backend id
     transformerNo: string;

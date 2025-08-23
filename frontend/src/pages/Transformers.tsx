@@ -6,20 +6,18 @@ import {
   createTransformer as apiCreate,
   deleteTransformer as apiDelete,
   updateTransformer as apiUpdate,
-} from "../api/transformers"; // <-- NEW API
+} from "../api/transformers";
 import { REGIONS_SL } from "../constants/regions";
 import Modal from "../components/Modal";
 
 type EditState = {
-  /** business id shown in UI = backend transformerNo */
-  id: string;
+  id: string; 
   region: string;
   poleNo: string;
   type: TransformerKind;
   locationDetails: string;
   favorite?: boolean;
-  /** numeric DB id from backend when editing */
-  backendId?: number;
+  backendId?: number; 
 };
 
 type SearchField = "id" | "poleNo";
@@ -47,7 +45,7 @@ export default function Transformers() {
   const [form, setForm] = useState<EditState>(initialForm);
   const [openAdd, setOpenAdd] = useState(false);
 
-  // Delete confirmation (numeric backend id)
+  // Delete confirmation
   const [confirmBackendId, setConfirmBackendId] = useState<number | null>(null);
 
   // Inline edit
@@ -83,7 +81,7 @@ export default function Transformers() {
     refresh();
   }, []);
 
-  // ---------- Validation / CRUD ----------
+
   function validate(t: EditState) {
     if (!t.region.trim()) return "Region is required.";
     if (!t.id.trim()) return "Transformer No is required.";
@@ -106,7 +104,6 @@ export default function Transformers() {
         locationDetails: form.locationDetails,
         favorite: !!form.favorite,
       });
-      // optimistic insert (keeps table position snappy)
       setItems((prev) => [created, ...prev]);
       setForm(initialForm);
       setOpenAdd(false);
@@ -129,7 +126,7 @@ export default function Transformers() {
   function startEdit(row: Transformer) {
     setEditingId(row.id);
     setEdit({
-      backendId: row.backendId, // keep numeric id for PUT
+      backendId: row.backendId,
       id: row.id,
       region: row.region ?? "",
       poleNo: row.poleNo ?? "",
@@ -169,27 +166,24 @@ export default function Transformers() {
   }
 
   async function toggleFavorite(t: Transformer) {
-    // optimistic UI toggle
     const draft = { ...t, favorite: !t.favorite };
     setItems((old) => old.map((x) => (x.backendId === t.backendId ? draft : x)));
     try {
       await apiUpdate(draft);
     } catch {
-      // revert if failed
       setItems((old) => old.map((x) => (x.backendId === t.backendId ? t : x)));
       alert("Failed to update favorite");
     }
   }
 
   function handleView(id: string) {
-    navigate(`/transformers/${id}/inspections`); // Navigating to the inspections page
+    navigate(`/transformers/${id}/inspections`);
   }
 
   // ---------- Filtering ----------
   const filtered = useMemo(() => {
     let data = items;
 
-    // text filter
     const q = searchText.trim().toLowerCase();
     if (q) {
       data = data.filter((t) =>
@@ -197,15 +191,12 @@ export default function Transformers() {
       );
     }
 
-    // favorites
     if (favOnly) data = data.filter((t) => !!t.favorite);
 
-    // region
     if (regionFilter !== "All Regions") {
       data = data.filter((t) => t.region === regionFilter);
     }
 
-    // type
     if (typeFilter !== "All Types") {
       data = data.filter((t) => t.type === typeFilter);
     }
@@ -213,7 +204,6 @@ export default function Transformers() {
     return data;
   }, [items, searchText, searchField, favOnly, regionFilter, typeFilter]);
 
-  // reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [searchText, searchField, favOnly, regionFilter, typeFilter]);
@@ -261,6 +251,7 @@ export default function Transformers() {
             className="input"
             value={searchField}
             onChange={(e) => setSearchField(e.target.value as SearchField)}
+            style={{ width: 160 }}
           >
             <option value="id">By Transformer No</option>
             <option value="poleNo">By Pole No</option>
@@ -268,9 +259,7 @@ export default function Transformers() {
 
           <input
             className="input"
-            placeholder={
-              searchField === "id" ? "Search transformer..." : "Search pole..."
-            }
+            placeholder={searchField === "id" ? "Search transformer..." : "Search pole..."}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             style={{ minWidth: 240 }}
@@ -294,10 +283,13 @@ export default function Transformers() {
           {favOnly ? "★" : "☆"}
         </button>
 
+        {/* Compact Region + Type selectors */}
         <select
           className="input"
           value={regionFilter}
           onChange={(e) => setRegionFilter(e.target.value)}
+          style={{ width: 180 }} 
+          title="Filter by Region"
         >
           <option>All Regions</option>
           {REGIONS_SL.map((r) => (
@@ -311,6 +303,8 @@ export default function Transformers() {
           className="input"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value as any)}
+          style={{ width: 140 }} 
+          title="Filter by Type"
         >
           <option>All Types</option>
           <option value="Distribution">Distribution</option>
@@ -333,18 +327,17 @@ export default function Transformers() {
               <th>Pole No</th>
               <th>Region</th>
               <th>Type</th>
-              <th>Location Details</th>
               <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7}>Loading…</td>
+                <td colSpan={6}>Loading…</td>
               </tr>
             ) : pageData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="subtle">
+                <td colSpan={6} className="subtle">
                   No transformers found.
                 </td>
               </tr>
@@ -427,27 +420,13 @@ export default function Transformers() {
                       )}
                     </td>
 
-                    <td>
-                      {isEditing ? (
-                        <input
-                          className="input"
-                          value={edit?.locationDetails ?? ""}
-                          onChange={(e) =>
-                            setEdit((s) =>
-                              s ? { ...s, locationDetails: e.target.value } : s
-                            )
-                          }
-                        />
-                      ) : (
-                        t.locationDetails
-                      )}
-                    </td>
+                    {/* Location Details column removed */}
 
                     <td>
                       <div className="hstack" style={{ justifyContent: "flex-end", gap: 8 }}>
                         {!isEditing && (
                           <button
-                            onClick={() => handleView(t.id)} // View button now navigates to inspections page
+                            onClick={() => handleView(t.id)}
                             style={{
                               background: "#3f51b5",
                               color: "#fff",

@@ -1,4 +1,3 @@
-// src/pages/InspectionDetail.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -124,7 +123,6 @@ export default function InspectionDetail() {
   const { inspection: passedInspection, transformer: passedTransformer } =
     (location.state as LocState) || {};
 
-  // Fallbacks if user opens the detail route directly
   const inspection = useMemo<Inspection>(
     () =>
       passedInspection || {
@@ -168,7 +166,7 @@ export default function InspectionDetail() {
     };
   }, [baselineImageUrl]);
 
-  // -------- Baseline handlers --------
+  //  Baseline handlers 
   function handleBaselinePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -193,7 +191,7 @@ export default function InspectionDetail() {
     setStepAI("Pending");
     setStepReview("Pending");
 
-    // Fake async pipeline
+
     setTimeout(() => {
       setStepUpload("Completed");
       setStepAI("In Progress");
@@ -352,7 +350,6 @@ export default function InspectionDetail() {
 
       {/* BODY */}
       <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 18, padding: "0 28px" }}>
-        {/* LEFT COLUMN: Thermal Image card */}
         <div
           style={{
             background: color.card,
