@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "inspections")
@@ -26,6 +28,12 @@ public class InspectionDetails {
 
     @Column(name = "status")
     private String status;
+
+    @Column(name = "inspection_date")
+    private LocalDate inspectionDate;
+
+    @Column(name = "inspection_time")
+    private LocalTime inspectionTime;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
