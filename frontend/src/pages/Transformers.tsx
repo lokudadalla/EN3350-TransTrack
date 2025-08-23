@@ -182,7 +182,7 @@ export default function Transformers() {
   }
 
   function handleView(id: string) {
-    navigate(`/transformers/${id}`);
+    navigate(`/transformers/${id}/inspections`); // Navigating to the inspections page
   }
 
   // ---------- Filtering ----------
@@ -447,7 +447,7 @@ export default function Transformers() {
                       <div className="hstack" style={{ justifyContent: "flex-end", gap: 8 }}>
                         {!isEditing && (
                           <button
-                            onClick={() => handleView(t.id)}
+                            onClick={() => handleView(t.id)} // View button now navigates to inspections page
                             style={{
                               background: "#3f51b5",
                               color: "#fff",
