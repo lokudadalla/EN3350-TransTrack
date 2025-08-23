@@ -1,6 +1,7 @@
 package com.entc.controller;
 
 import com.entc.dao.InspectionDetails;
+import com.entc.dao.TransformerDetails;
 import com.entc.service.InspectionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,12 @@ public class InspectionController {
         InspectionDetails created = inspectionService.create(body);
         URI location = URI.create("/inspections/" + created.getInspectionNo());
         return ResponseEntity.created(location).body(created);
+    }
+
+    // Get by transformer No.
+    @GetMapping("/by-no")
+    public InspectionDetails getByTransformerNo(@RequestParam("no") String transformerNo) {
+        return inspectionService.getInspectionByTransformerNo(transformerNo);
     }
 
     @GetMapping("/{id}")

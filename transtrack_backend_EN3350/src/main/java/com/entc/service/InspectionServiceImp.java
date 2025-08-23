@@ -35,6 +35,14 @@ public class InspectionServiceImp implements InspectionService {
     }
 
     @Override
+    public InspectionDetails getInspectionByTransformerNo(String transformerNo) {
+
+        InspectionDetails inspectionT = inspectionRepository.findInspectionByTransformerNo(transformerNo);
+        if (inspectionT == null) throw new RuntimeException("Inspections not found for the Transformer No: " + transformerNo);
+        return inspectionT;
+    }
+
+    @Override
     public InspectionDetails update(Long id, InspectionDetails body) {
         return inspectionRepository.findById(id).map(existing -> {
             if (body.getTransformerNo() != null) {
