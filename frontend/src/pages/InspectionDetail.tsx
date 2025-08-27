@@ -471,7 +471,6 @@ export default function InspectionDetail() {
           <Chip title="Transformer No" value={header.transformerNo} />
           <Chip title="Pole No" value={header.poleNo} />
           <Chip title="Branch" value={header.branch} />
-          <Chip title="Inspected By" value={header.inspectedBy} />
         </div>
       </div>
 

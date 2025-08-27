@@ -262,6 +262,8 @@ export default function InspectionsPage() {
   const [editDate, setEditDate] = useState<string>("");
   const [editTime, setEditTime] = useState<string>("07:00");
   const [editLoading, setEditLoading] = useState(false);
+  const [editMaintDate, setEditMaintDate] = useState<string>("");
+  const [editMaintTime, setEditMaintTime] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -461,6 +463,12 @@ export default function InspectionsPage() {
       setEditStatus((dto.status as Status) || "Pending");
       setEditDate(dto.inspectionDate);
       setEditTime((dto.inspectionTime || "07:00:00").slice(0, 5));
+      setEditMaintDate("");
+      setEditMaintTime("");
+      if (row.maintenanceDate && row.maintenanceDate !== "-") {
+        setEditMaintDate("");
+        setEditMaintTime("");
+      }
     } catch (e: any) {
       alert(e?.message ?? "Load failed");
       setEditOpen(false);
@@ -487,7 +495,17 @@ export default function InspectionsPage() {
       const mapped = mapDTOtoUI(updated);
       setInspections((prev) =>
         prev
-          .map((r) => (r.inspectionNo === pad8(editId) ? { ...r, ...mapped } : r))
+          .map((r) => {
+            if (r.inspectionNo !== pad8(editId)) return r;
+            const merged: Inspection = { ...r, ...mapped };
+            if (editMaintDate && editMaintTime) {
+              const mt = editMaintTime.length === 5 ? `${editMaintTime}:00` : editMaintTime;
+              merged.maintenanceDate = joinDateTime(editMaintDate, mt);
+            } else {
+              merged.maintenanceDate = r.maintenanceDate ?? "-";
+            }
+            return merged;
+          })
           .sort((a, b) => {
             const at = new Date(a.inspectedDate).getTime();
             const bt = new Date(b.inspectedDate).getTime();
@@ -1023,6 +1041,43 @@ export default function InspectionsPage() {
                   <option value="In Progress">In Progress</option>
                   <option value="Completed">Completed</option>
                 </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                    Maintenance Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editMaintDate}
+                    onChange={(e) => setEditMaintDate(e.target.value)}
+                    disabled={editLoading}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: `1px solid ${ui.border}`,
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                    Maintenance Time
+                  </label>
+                  <input
+                    type="time"
+                    value={editMaintTime}
+                    onChange={(e) => setEditMaintTime(e.target.value)}
+                    disabled={editLoading}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: `1px solid ${ui.border}`,
+                    }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
