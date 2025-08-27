@@ -180,7 +180,7 @@ export default function Transformers() {
     navigate(`/transformers/${id}/inspections`);
   }
 
-  // ---------- Filtering ----------
+  // Filtering 
   const filtered = useMemo(() => {
     let data = items;
 
@@ -208,7 +208,7 @@ export default function Transformers() {
     setPage(1);
   }, [searchText, searchField, favOnly, regionFilter, typeFilter]);
 
-  // ---------- Pagination ----------
+  // Pagination 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const start = (page - 1) * PAGE_SIZE;
   const pageData = filtered.slice(start, start + PAGE_SIZE);
@@ -222,7 +222,7 @@ export default function Transformers() {
     setPage(1);
   }
 
-  // ---------- UI ----------
+  // UI 
   return (
     <div className="vstack" style={{ gap: 16 }}>
       {/* title row & add button */}
@@ -283,7 +283,7 @@ export default function Transformers() {
           {favOnly ? "★" : "☆"}
         </button>
 
-        {/* Compact Region + Type selectors */}
+        {/* Filtering Region + Type selectors */}
         <select
           className="input"
           value={regionFilter}
@@ -420,7 +420,7 @@ export default function Transformers() {
                       )}
                     </td>
 
-                    {/* Location Details column removed */}
+                    {/*  */}
 
                     <td>
                       <div className="hstack" style={{ justifyContent: "flex-end", gap: 8 }}>

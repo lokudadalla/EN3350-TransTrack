@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTransformerByNo } from "../api/transformers"; 
+import { getTransformerByNo } from "../api/transformers";
+import { REGIONS_SL } from "../constants/regions"; 
 
-// Types 
+// Types
 type Status = "Completed" | "In Progress" | "Pending";
 
 interface Inspection {
@@ -14,11 +15,11 @@ interface Inspection {
 }
 
 interface TransformerMeta {
-  id: string;                  // Transformer No 
+  id: string;                  // Transformer No
   poleNo: string;
   type: "Bulk" | "Distribution";
   region: string;
-  location: string;            
+  location: string;
   lastInspected: string;
 }
 
@@ -50,7 +51,7 @@ function pill(status: Status): React.CSSProperties {
       padding: "6px 12px",
       borderRadius: 999,
       fontWeight: 800,
-      background: "rgba(250,204,21,.20)", 
+      background: "rgba(250,204,21,.20)",
       color: "#ca8a04",
     };
   return {
@@ -108,7 +109,7 @@ const actionIconBtn: React.CSSProperties = {
   boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
 };
 
-//  Inspections backend client 
+//  Inspections backend client
 type InspectionDTO = {
   inspectionNo: number;
   transformerNo: string;
@@ -148,8 +149,7 @@ const InspectionsAPI = {
   },
 };
 
-
-// Mappers & formatters 
+// Mappers & formatters
 function pad8(n: number | string) {
   const num = typeof n === "string" ? Number(n) : n;
   return String(num).padStart(8, "0");
@@ -223,7 +223,7 @@ export default function InspectionsPage() {
 
   // modal state
   const [openModal, setOpenModal] = useState(false);
-  const [branch, setBranch] = useState("Nugegoda");
+  const [branch, setBranch] = useState("Nugegoda"); 
   const [dateStr, setDateStr] = useState("Mon(21), May, 2023");
   const [timeStr, setTimeStr] = useState("7.00am");
 
@@ -240,26 +240,24 @@ export default function InspectionsPage() {
   );
   const [transformer, setTransformer] = useState<TransformerMeta>(baseTransformer);
 
-
   useEffect(() => {
     let cancelled = false;
     async function loadTransformer() {
       if (!transformerId) return;
       try {
-        const t = await getTransformerByNo(transformerId); 
+        const t = await getTransformerByNo(transformerId);
         if (!cancelled) {
           setTransformer((prev) => ({
             ...prev,
-            id: t.id, 
+            id: t.id,
             poleNo: t.poleNo,
             type: t.type,
             region: t.region,
-            location: t.locationDetails, 
+            location: t.locationDetails,
           }));
         }
       } catch (e: any) {
         if (!cancelled) {
-          
           setError((old) => old ?? "Failed to load transformer details");
         }
       }
@@ -270,59 +268,58 @@ export default function InspectionsPage() {
     };
   }, [transformerId]);
 
-  //Load inspections from backend 
-useEffect(() => {
-  let cancelled = false;
+  //Load inspections from backend
+  useEffect(() => {
+    let cancelled = false;
 
-  async function loadInspections() {
-    if (!transformerId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      // fetch only this transformer’s inspections
-      const mine = await InspectionsAPI.listByTransformerNo(transformerId);
+    async function loadInspections() {
+      if (!transformerId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        // fetch only this transformer’s inspections
+        const mine = await InspectionsAPI.listByTransformerNo(transformerId);
 
-      // sort newest first
-      mine.sort((a, b) => {
-        const at =
-          new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
-          new Date(a.createdAt).getTime();
-        const bt =
-          new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
-          new Date(b.createdAt).getTime();
-        return bt - at;
-      });
+        // sort newest first
+        mine.sort((a, b) => {
+          const at =
+            new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
+            new Date(a.createdAt).getTime();
+          const bt =
+            new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
+            new Date(b.createdAt).getTime();
+          return bt - at;
+        });
 
-      const rows = mine.map(mapDTOtoUI);
+        const rows = mine.map(mapDTOtoUI);
 
-      if (!cancelled) {
-        setInspections(rows);
-        setTransformer((t) => ({
-          ...t,
-          lastInspected: mine[0]
-            ? joinDateTime(mine[0].inspectionDate, mine[0].inspectionTime)
-            : "-",
-        }));
+        if (!cancelled) {
+          setInspections(rows);
+          setTransformer((t) => ({
+            ...t,
+            lastInspected: mine[0]
+              ? joinDateTime(mine[0].inspectionDate, mine[0].inspectionTime)
+              : "-",
+          }));
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message ?? "Failed to load inspections");
+          setInspections([]);
+          setTransformer((t) => ({ ...t, lastInspected: "-" }));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (e: any) {
-      if (!cancelled) {
-        setError(e?.message ?? "Failed to load inspections");
-        setInspections([]);
-        setTransformer((t) => ({ ...t, lastInspected: "-" }));
-      }
-    } finally {
-      if (!cancelled) setLoading(false);
     }
-  }
 
-  loadInspections();
-  return () => {
-    cancelled = true;
-  };
-}, [transformerId]);
+    loadInspections();
+    return () => {
+      cancelled = true;
+    };
+  }, [transformerId]);
 
-
-  // baseline handlers 
+  // baseline handlers
   function onPickBaseline(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -338,7 +335,7 @@ useEffect(() => {
     setBaselineUrl(null);
   }
 
-  // add inspection 
+  // add inspection
   async function addInspection(e: React.FormEvent) {
     e.preventDefault();
     if (!transformerId) return;
@@ -366,7 +363,7 @@ useEffect(() => {
     }
   }
 
-  // navigation 
+  // navigation
   function goDetail(row: Inspection) {
     navigate(`/transformers/${transformer.id}/inspections/${row.inspectionNo}`, {
       state: {
@@ -381,7 +378,7 @@ useEffect(() => {
     else navigate("/transformers");
   }
 
-  // Render 
+  // Render
   return (
     <div style={{ background: ui.bg }}>
       {/* HEADER CARD */}
@@ -663,8 +660,11 @@ useEffect(() => {
             <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>New Inspection</div>
             <form onSubmit={addInspection} style={{ display: "grid", gap: 14 }}>
               <div>
-                <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>Branch</label>
-                <input
+                <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                  Branch
+                </label>
+                {/* Dropdown for Branch */}
+                <select
                   value={branch}
                   onChange={(e) => setBranch(e.target.value)}
                   style={{
@@ -672,9 +672,17 @@ useEffect(() => {
                     padding: "12px 14px",
                     borderRadius: 12,
                     border: `1px solid ${ui.border}`,
+                    background: "#fff",
+                    fontWeight: 700,
+                    color: "#334155",
                   }}
-                  placeholder="Branch"
-                />
+                >
+                  {REGIONS_SL.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -765,9 +773,5 @@ function Chip({ title, value }: { title: string; value: string }) {
     </div>
   );
 }
-
-
-
-
 
 
