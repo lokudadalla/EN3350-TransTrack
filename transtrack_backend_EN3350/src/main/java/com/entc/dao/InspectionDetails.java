@@ -40,6 +40,9 @@ public class InspectionDetails {
     @Column(name = "inspection_time")
     private LocalTime inspectionTime;
 
+    @Column(name = "maintenance_date")
+    private String maintenanceDate = "-";
+
     //TODO: Add inspected by:
 
     @Column(name = "created_at")
