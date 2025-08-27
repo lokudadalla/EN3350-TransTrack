@@ -334,6 +334,8 @@ export default function InspectionDetail() {
     e.currentTarget.value = "";
   }
 
+  const thermalStatus: Status = (maintMeta || maintUrl) ? "Completed" : (showUpload ? "In Progress" : "Pending");
+
   /* ----- Render ----- */
   return (
     <div style={{ background: ui.bg, minHeight: "100vh", padding: 24 }}>
@@ -488,7 +490,7 @@ export default function InspectionDetail() {
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ fontSize: 18, fontWeight: 900 }}>Thermal Image</div>
-            <span style={pill("Pending")}>Pending</span>
+            <span style={pill(thermalStatus)}>{thermalStatus}</span>
           </div>
 
           <p style={{ color: ui.sub, marginTop: 10 }}>
