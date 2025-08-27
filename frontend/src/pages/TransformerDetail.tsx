@@ -30,7 +30,6 @@ export default function TransformerDetail() {
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleUpload(e: React.FormEvent<HTMLFormElement>) {

@@ -1,466 +1,794 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
+
 type Status = "Completed" | "In Progress" | "Pending";
+type ImageType = "BASELINE" | "MAINTENANCE";
+type Condition = "SUNNY" | "CLOUDY" | "RAINY";
 
-interface Inspection {
-  inspectionNo: string;
-  inspectedDate: string;
-  status: Status;
-}
-
-interface TransformerMeta {
-  id: string;
-  poleNo: string;
-  type: "Bulk" | "Distribution";
-  region: string;
-  location: string;
-  lastInspected: string;
-}
-
-type LocState = {
-  inspection?: Inspection;
-  transformer?: TransformerMeta;
+type InspectionDTO = {
+  inspectionNo: number;
+  transformerNo: string;
+  branch: string;
+  status: string;
+  inspectionDate: string; // YYYY-MM-DD
+  inspectionTime: string; // HH:mm:ss
+  createdAt: string;      
 };
 
-const color = {
+type ImageMeta = {
+  id: number;
+  type: ImageType;
+  fileName: string;
+  contentType: string;
+  size?: number;
+  uploadedAt: string; // ISO
+  url?: string;       // server gives /inspections/{id}/images/{imageId}/file
+  uploader?: string;
+  condition?: Condition;
+};
+
+type TransformerHeader = {
+  transformerNo: string;
+  poleNo?: string;
+  branch?: string;
+  inspectedBy?: string;
+  status: Status;
+  lastUpdated: string;
+};
+
+const ui = {
   bg: "#f6f8fb",
-  card: "#ffffff",
+  card: "#fff",
   text: "#0f172a",
-  subtext: "#64748b",
+  sub: "#64748b",
+  border: "#e6eaf2",
   primary: "#3f51b5",
   danger: "#dc2626",
-  border: "#e6eaf2",
-  shadow: "0 10px 30px rgba(31,41,55,0.08)",
+  warnBg: "rgba(250,204,21,.20)",
+  warn: "#ca8a04",
+  okBg: "rgba(34,197,94,.12)",
+  ok: "#16a34a",
+  errBg: "rgba(244,63,94,.12)",
+  err: "#f43f5e",
+  shadow: "0 10px 30px rgba(31,41,55,.08)",
 };
 
-function statusPillStyle(s: Status): React.CSSProperties {
-  if (s === "Completed")
-    return {
-      display: "inline-flex",
-      padding: "6px 12px",
-      borderRadius: 999,
-      fontWeight: 700,
-      background: "rgba(34,197,94,.12)",
-      color: "#16a34a",
-    };
-  if (s === "In Progress")
-    return {
-      display: "inline-flex",
-      padding: "6px 12px",
-      borderRadius: 999,
-      fontWeight: 700,
-      background: "rgba(250,204,21,.20)", // yellow
-      color: "#ca8a04",
-    };
-  return {
-    display: "inline-flex",
-    padding: "6px 12px",
-    borderRadius: 999,
-    fontWeight: 700,
-    background: "rgba(244,63,94,.12)",
-    color: "#f43f5e",
-  };
+/* Small helpers */
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
+function api(path: string) {
+  return `${API_BASE}${path}`;
 }
 
-const chip: React.CSSProperties = {
+function toNiceDateTime(d: string, t: string) {
+  const dt = new Date(`${d}T${t}`);
+  return dt.toLocaleString("en-US", {
+    weekday: "short",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function pill(status: Status): React.CSSProperties {
+  if (status === "Completed")
+    return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.okBg, color: ui.ok };
+  if (status === "In Progress")
+    return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.warnBg, color: ui.warn };
+  return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.errBg, color: ui.err };
+}
+
+const chipWrap: React.CSSProperties = {
   background: "#eef2ff",
   border: "1px solid #e0e7ff",
-  borderRadius: 14,
-  padding: "10px 14px",
-  minWidth: 120,
+  borderRadius: 16,
+  padding: "12px 16px",
+  minWidth: 110,
   textAlign: "center",
   boxShadow: "0 6px 14px rgba(79,70,229,0.12)",
 };
+function Chip({ title, value }: { title: string; value?: string }) {
+  return (
+    <div style={chipWrap}>
+      <div style={{ fontWeight: 900, color: "#111827" }}>{value ?? "-"}</div>
+      <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 700 }}>{title}</div>
+    </div>
+  );
+}
 
-const primaryBtn: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-  padding: "12px 18px",
-  borderRadius: 14,
-  fontWeight: 800,
-  color: "#fff",
-  background: color.primary,
-  border: "1px solid transparent",
-  cursor: "pointer",
-  boxShadow: "0 10px 25px rgba(63,81,181,.25)",
-  width: "100%",
-};
+async function resolveImageUrl(
+  inspectionId: number,
+  meta: ImageMeta,
+  setUrl: (u: string) => void
+) {
+  try {
+    if (meta.url) {
+      const full = meta.url.startsWith("http") ? meta.url : `${API_BASE}${meta.url}`;
+      setUrl(full);
+      return;
+    }
+    const res = await fetch(api(`/inspections/${inspectionId}/images/${meta.id}/file`));
+    if (!res.ok) throw new Error("Failed to fetch image");
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    setUrl(objectUrl);
+  } catch (e) {
+    console.error(e);
+  }
+}
 
-const actionIconBtn: React.CSSProperties = {
-  width: 30,
-  height: 30,
-  display: "grid",
-  placeItems: "center",
-  background: "#fff",
-  border: "1px solid #e0e7ff",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 16,
-  lineHeight: 1,
-  boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid #e5e7eb",
-  background: "#fff",
-  outline: "none",
-  fontSize: 15,
-};
-
+/*  Page  */
 export default function InspectionDetail() {
+  const { transformerId, inspectionNo } = useParams<{ transformerId: string; inspectionNo: string }>();
   const navigate = useNavigate();
-  const { transformerId, inspectionNo } = useParams<{
-    transformerId: string;
-    inspectionNo: string;
-  }>();
   const location = useLocation();
-  const { inspection: passedInspection, transformer: passedTransformer } =
-    (location.state as LocState) || {};
 
-  const inspection = useMemo<Inspection>(
-    () =>
-      passedInspection || {
-        inspectionNo: inspectionNo ?? "00000000",
-        inspectedDate: "Mon(21), May, 2023 12:55pm",
-        status: "In Progress",
-      },
-    [passedInspection, inspectionNo]
-  );
+  const numericInspectionId = useMemo(() => Number(inspectionNo), [inspectionNo]);
 
-  const transformer = useMemo<TransformerMeta>(
-    () =>
-      passedTransformer || {
-        id: transformerId ?? "TX-1001",
-        poleNo: "EN-122-A",
-        type: "Bulk",
-        region: "Nugegoda",
-        location: `"Keels", Embuldeniya`,
-        lastInspected: inspection.inspectedDate,
-      },
-    [passedTransformer, transformerId, inspection.inspectedDate]
-  );
+  // Header / meta
+  const [header, setHeader] = useState<TransformerHeader>({
+    transformerNo: transformerId ?? "-",
+    branch: "-",
+    poleNo: "-",
+    inspectedBy: "-",
+    status: "Pending",
+    lastUpdated: "-",
+  });
 
-  // Baseline image (object URL for preview/view)
-  const [baselineImageUrl, setBaselineImageUrl] = useState<string | null>(null);
+  // Images
+  const [baselineMeta, setBaselineMeta] = useState<ImageMeta | null>(null);
+  const [maintMeta, setMaintMeta] = useState<ImageMeta | null>(null);
+  const [baselineUrl, setBaselineUrl] = useState<string | null>(null);
+  const [maintUrl, setMaintUrl] = useState<string | null>(null);
 
-  // Maintenance upload state
-  const [thermalFile, setThermalFile] = useState<File | null>(null);
-  const [weather, setWeather] = useState<"Sunny" | "Cloudy" | "Rainy">("Sunny");
-  const [uploading, setUploading] = useState(false);
+  // Weather condition (dropdown)
+  const [condition, setCondition] = useState<Condition>("SUNNY");
 
-  // Progress steps
-  const [stepUpload, setStepUpload] = useState<Status>("Pending");
-  const [stepAI, setStepAI] = useState<Status>("Pending");
-  const [stepReview, setStepReview] = useState<Status>("Pending");
+  // Upload modal
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadingType, setUploadingType] = useState<ImageType | null>(null); // kept for parity
+  const activeXhr = useRef<XMLHttpRequest | null>(null);
 
-  // Clean up object URLs
+
+  const [error, setError] = useState<string | null>(null);
+
+  /* Load inspection header  */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setError(null);
+
+        // prefer state passed from list page
+        const fromState = (location.state as any)?.inspection;
+        if (fromState?.inspectedDate) {
+          setHeader((h) => ({
+            ...h,
+            transformerNo: transformerId ?? h.transformerNo,
+            branch: (location.state as any)?.transformer?.region ?? h.branch,
+            poleNo: (location.state as any)?.transformer?.poleNo ?? h.poleNo,
+            status: fromState.status as Status,
+            lastUpdated: fromState.inspectedDate,
+          }));
+        } else {
+          // fetch from backend by numeric inspection id
+          const res = await fetch(api(`/inspections/${numericInspectionId}`));
+          if (!res.ok) throw new Error(`Failed to load inspection ${numericInspectionId}`);
+          const dto: InspectionDTO = await res.json();
+
+          setHeader({
+            transformerNo: dto.transformerNo,
+            poleNo: "-", 
+            branch: dto.branch,
+            inspectedBy: "-",
+            status: (dto.status as Status) || "Pending",
+            lastUpdated: toNiceDateTime(dto.inspectionDate, dto.inspectionTime),
+          });
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? "Failed to load inspection");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [numericInspectionId, transformerId, location.state]);
+
+  /* Load image metadata */
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchType(t: ImageType) {
+      const res = await fetch(api(`/inspections/${numericInspectionId}/images?type=${t}`));
+      if (!res.ok) return null;
+      const list: ImageMeta[] = await res.json();
+      const latest =
+        list?.slice().sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0] ?? null;
+      return latest ?? null;
+    }
+
+    (async () => {
+      if (!numericInspectionId) return;
+      const [b, m] = await Promise.all([fetchType("BASELINE"), fetchType("MAINTENANCE")]);
+      if (cancelled) return;
+
+      setBaselineMeta(b);
+      setMaintMeta(m);
+
+      if (b) resolveImageUrl(numericInspectionId, b, (u: string) => setBaselineUrl(u));
+      if (m) resolveImageUrl(numericInspectionId, m, (u: string) => setMaintUrl(u));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [numericInspectionId]);
+
+  /*  Helpers: view/delete/upload */
+  function goBack() {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/transformers");
+  }
+
+  async function view(meta: ImageMeta | null, url: string | null) {
+    if (!meta) return;
+    if (url) {
+      window.open(url, "_blank");
+      return;
+    }
+    await resolveImageUrl(numericInspectionId, meta, (u: string) => window.open(u, "_blank"));
+  }
+
+  async function remove(meta: ImageMeta | null, onDone: () => void) {
+    if (!meta) return;
+    if (!confirm("Delete this image?")) return;
+    const res = await fetch(api(`/inspections/${numericInspectionId}/images/${meta.id}`), { method: "DELETE" });
+    if (res.status === 204) onDone();
+    else alert("Delete failed");
+  }
+
+  function startUpload(t: ImageType, file: File) {
+    // keep your original XHR flow
+    setUploadingType(t);
+    setUploadPct(0);
+    setShowUpload(true);
+
+    const url = new URL(api(`/inspections/${numericInspectionId}/images`));
+    url.searchParams.set("type", t);
+    url.searchParams.set("uploader", "web");
+    url.searchParams.set("condition", condition);
+
+    const fd = new FormData();
+    fd.append("files", file);
+
+    const xhr = new XMLHttpRequest();
+    activeXhr.current = xhr;
+
+    xhr.upload.onprogress = (evt) => {
+      if (!evt.lengthComputable) return;
+      const pct = Math.round((evt.loaded / evt.total) * 100);
+      setUploadPct(pct);
+    };
+
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== 4) return;
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const list: ImageMeta[] = JSON.parse(xhr.responseText);
+          const latest = list?.[0];
+          if (t === "BASELINE") {
+            setBaselineMeta(latest || null);
+            if (latest) resolveImageUrl(numericInspectionId, latest, (u: string) => setBaselineUrl(u));
+          } else {
+            setMaintMeta(latest || null);
+            if (latest) resolveImageUrl(numericInspectionId, latest, (u: string) => setMaintUrl(u));
+          }
+        } catch {
+          
+        }
+      } else {
+        alert(`Upload error (HTTP ${xhr.status})`);
+      }
+
+      setShowUpload(false);
+      setUploadingType(null);
+      activeXhr.current = null;
+    };
+
+    xhr.open("POST", url.toString(), true);
+    xhr.send(fd);
+  }
+
+  function cancelUpload() {
+    activeXhr.current?.abort();
+    setShowUpload(false);
+    setUploadingType(null);
+    setUploadPct(0);
+  }
+
+  /* Clean up object URLs when they change / unmount */
   useEffect(() => {
     return () => {
-      if (baselineImageUrl) URL.revokeObjectURL(baselineImageUrl);
+      if (baselineUrl?.startsWith("blob:")) URL.revokeObjectURL(baselineUrl);
+      if (maintUrl?.startsWith("blob:")) URL.revokeObjectURL(maintUrl);
     };
-  }, [baselineImageUrl]);
+  }, [baselineUrl, maintUrl]);
 
-  //  Baseline handlers 
-  function handleBaselinePicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (baselineImageUrl) URL.revokeObjectURL(baselineImageUrl);
-    setBaselineImageUrl(url);
+  /* File pickers */
+  const baseInputRef = useRef<HTMLInputElement | null>(null);
+  const maintInputRef = useRef<HTMLInputElement | null>(null);
+
+  function onPickBaseline(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) startUpload("BASELINE", f);
+    e.currentTarget.value = ""; 
   }
-  function viewBaseline() {
-    if (baselineImageUrl) window.open(baselineImageUrl, "_blank");
-  }
-  function deleteBaseline() {
-    if (baselineImageUrl) URL.revokeObjectURL(baselineImageUrl);
-    setBaselineImageUrl(null);
-  }
-
-  // -------- Thermal upload flow --------
-  function startUpload() {
-    if (!thermalFile) return;
-    setUploading(true);
-
-    setStepUpload("In Progress");
-    setStepAI("Pending");
-    setStepReview("Pending");
-
-
-    setTimeout(() => {
-      setStepUpload("Completed");
-      setStepAI("In Progress");
-
-      setTimeout(() => {
-        setStepAI("Completed");
-        setStepReview("In Progress");
-
-        setTimeout(() => {
-          setStepReview("Completed");
-          setUploading(false);
-        }, 1200);
-      }, 1200);
-    }, 1200);
+  function onPickMaintenance(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) startUpload("MAINTENANCE", f);
+    e.currentTarget.value = ""; 
   }
 
+  /* Render */
   return (
-    <div style={{ background: color.bg, minHeight: "100vh", padding: "14px 0 28px 0" }}>
-      {/* HEADER BAR */}
+    <div style={{ background: ui.bg, minHeight: "100vh", padding: 24 }}>
+      {/* HEADER CARD */}
       <div
         style={{
-          background: color.card,
-          border: `1px solid ${color.border}`,
-          borderRadius: 16,
+          marginBottom: 16,
           padding: 18,
-          margin: "0 28px 18px 28px",
-          boxShadow: color.shadow,
-          display: "grid",
-          gridTemplateColumns: "1fr auto auto",
-          gap: 16,
-          alignItems: "center",
+          background: ui.card,
+          border: `1px solid ${ui.border}`,
+          borderRadius: 16,
+          boxShadow: ui.shadow,
         }}
       >
-        {/* Left: Back + title + chips */}
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          {/* Left: back + title */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button
-              onClick={() => navigate(-1)}
-              title="Back"
+              aria-label="Back"
+              onClick={goBack}
               style={{
-                width: 40,
-                height: 40,
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                background: ui.primary,
+                color: "#fff",
+                border: 0,
                 display: "grid",
                 placeItems: "center",
-                borderRadius: 12,
-                background: "#eef2ff",
-                border: "1px solid #e0e7ff",
+                fontWeight: 900,
                 cursor: "pointer",
-                fontSize: 16,
-                color: "#111827",
+                boxShadow: "0 8px 18px rgba(63,81,181,.35)",
               }}
             >
-              ◀
+              ←
             </button>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: color.text }}>{inspection.inspectionNo}</div>
-              <div style={{ fontSize: 12, color: color.subtext, fontWeight: 700 }}>{inspection.inspectedDate}</div>
+              <div style={{ fontSize: 26, fontWeight: 900, color: ui.text, lineHeight: 1.2 }}>
+                {String(numericInspectionId).padStart(8, "0")}
+              </div>
+              <div style={{ color: ui.sub, fontWeight: 700, marginTop: 4 }}>{header.lastUpdated}</div>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Chip label="Transformer No" value={transformer.id} />
-            <Chip label="Pole No" value={transformer.poleNo} />
-            <Chip label="Branch" value={transformer.region} />
-            <Chip label="Inspected By" value="A-110" />
+          {/* Right: status + Baseline pill */}
+          <div style={{ display: "grid", gap: 10, justifyItems: "end" }}>
+            <div>
+              <span style={{ fontWeight: 800, color: ui.sub, marginRight: 8 }}>Last updated:</span>
+              <span style={{ fontWeight: 800 }}>{header.lastUpdated}</span>
+              <span style={{ marginLeft: 12 }} />
+              <span style={pill(header.status)}>{header.status}</span>
+            </div>
+
+            {/* Baseline pill */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                background: "#eef2ff",
+                border: "1px solid #e0e7ff",
+                borderRadius: 14,
+                padding: "10px 14px",
+                height: 44,
+                cursor: "pointer",
+                minWidth: 260,
+              }}
+              onClick={() => baseInputRef.current?.click()}
+              title="Click to upload/replace the baseline image"
+            >
+              <input
+                ref={baseInputRef}
+                type="file"
+                accept="image/*"
+                onChange={onPickBaseline}
+                style={{ display: "none" }}
+              />
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span
+                  style={{
+                    width: 22,
+                    height: 22,
+                    display: "grid",
+                    placeItems: "center",
+                    borderRadius: 6,
+                    background: "#e0e7ff",
+                    fontSize: 16,
+                  }}
+                >
+                  🖼️
+                </span>
+                <span style={{ fontWeight: 900, color: "#111827" }}>Baseline Image</span>
+              </div>
+
+              <div style={{ flex: 1 }} />
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  title="View"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    view(baselineMeta, baselineUrl);
+                  }}
+                  disabled={!baselineMeta}
+                  style={iconBtn(!baselineMeta)}
+                >
+                  👁️
+                </button>
+                <button
+                  title="Delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    remove(baselineMeta, () => {
+                      setBaselineMeta(null);
+                      if (baselineUrl?.startsWith("blob:")) URL.revokeObjectURL(baselineUrl);
+                      setBaselineUrl(null);
+                    });
+                  }}
+                  disabled={!baselineMeta}
+                  style={iconBtn(!baselineMeta, true)}
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Center: last updated + status pill */}
-        <div style={{ justifySelf: "end", textAlign: "right" }}>
-          <div style={{ color: color.subtext, fontWeight: 800 }}>
-            Last updated: <span style={{ color: color.text }}>{inspection.inspectedDate}</span>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <span style={statusPillStyle(inspection.status)}>{inspection.status}</span>
-          </div>
-        </div>
-
-        {/* Right: Baseline Image block */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            background: "#eef2ff",
-            border: "1px solid #e0e7ff",
-            borderRadius: 14,
-            padding: "10px 14px",
-            height: 44,
-            lineHeight: 1,
-            cursor: "pointer",
-          }}
-          onClick={() => document.getElementById("baseline-upload-detail")?.click()}
-        >
-          <input
-            id="baseline-upload-detail"
-            type="file"
-            accept="image/*"
-            onChange={handleBaselinePicked}
-            style={{ display: "none" }}
-          />
-
-          <span style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800, color: "#111827" }}>
-            <span
-              style={{
-                width: 22,
-                height: 22,
-                display: "grid",
-                placeItems: "center",
-                borderRadius: 6,
-                background: "#e0e7ff",
-                fontSize: 16,
-              }}
-            >
-              🖼️
-            </span>
-            <span>Baseline Image</span>
-          </span>
-
-          <div style={{ marginLeft: 10, display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              title="View"
-              onClick={(e) => {
-                e.stopPropagation();
-                viewBaseline();
-              }}
-              disabled={!baselineImageUrl}
-              style={{
-                ...actionIconBtn,
-                color: "#4338ca",
-                cursor: baselineImageUrl ? "pointer" : "not-allowed",
-                opacity: baselineImageUrl ? 1 : 0.5,
-              }}
-            >
-              👁️
-            </button>
-            <button
-              title="Delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteBaseline();
-              }}
-              disabled={!baselineImageUrl}
-              style={{
-                ...actionIconBtn,
-                color: color.danger,
-                cursor: baselineImageUrl ? "pointer" : "not-allowed",
-                opacity: baselineImageUrl ? 1 : 0.5,
-              }}
-            >
-              🗑️
-            </button>
-          </div>
+        {/* Chips row */}
+        <div style={{ display: "flex", gap: 14, marginTop: 16, alignItems: "stretch", flexWrap: "wrap" }}>
+          <Chip title="Transformer No" value={header.transformerNo} />
+          <Chip title="Pole No" value={header.poleNo} />
+          <Chip title="Branch" value={header.branch} />
+          <Chip title="Inspected By" value={header.inspectedBy} />
         </div>
       </div>
 
-      {/* BODY */}
-      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 18, padding: "0 28px" }}>
+      {/* LEFT/RIGHT SECTION */}
+      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 18 }}>
+        {/* LEFT CARD: uploader (maintenance) */}
         <div
           style={{
-            background: color.card,
-            border: `1px solid ${color.border}`,
+            background: ui.card,
+            border: `1px solid ${ui.border}`,
             borderRadius: 16,
-            padding: 18,
-            boxShadow: color.shadow,
+            boxShadow: ui.shadow,
+            padding: 16,
             height: "fit-content",
           }}
         >
-          {/* Card header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: color.text }}>Thermal Image</div>
-            <span style={statusPillStyle("Pending")}>Pending</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 18, fontWeight: 900 }}>Thermal Image</div>
+            <span style={pill("Pending")}>Pending</span>
           </div>
 
-          <div style={{ color: color.subtext, fontSize: 14, marginBottom: 14 }}>
+          <p style={{ color: ui.sub, marginTop: 10 }}>
             Upload a thermal image of the transformer to identify potential issues.
-          </div>
+          </p>
 
-          {/* Weather */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontWeight: 700, display: "block", marginBottom: 6, color: color.subtext }}>
+          <div style={{ marginTop: 10 }}>
+            <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
               Weather Condition
             </label>
+
+            {/* Dropdown */}
             <select
-              value={weather}
-              onChange={(e) => setWeather(e.target.value as "Sunny" | "Cloudy" | "Rainy")}
-              style={inputStyle}
+              value={condition}
+              onChange={(e) => setCondition(e.target.value as Condition)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: `1px solid ${ui.border}`,
+                fontWeight: 700,
+                color: "#334155",
+              }}
             >
-              <option value="Sunny">Sunny</option>
-              <option value="Cloudy">Cloudy</option>
-              <option value="Rainy">Rainy</option>
+              <option value="SUNNY">Sunny</option>
+              <option value="CLOUDY">Cloudy</option>
+              <option value="RAINY">Rainy</option>
             </select>
           </div>
 
-          {/* Upload button */}
           <input
-            id="thermal-file"
+            ref={maintInputRef}
             type="file"
             accept="image/*"
-            onChange={(e) => {
-              const f = e.target.files?.[0] ?? null;
-              setThermalFile(f);
-              if (f) startUpload();
-            }}
+            onChange={onPickMaintenance}
             style={{ display: "none" }}
           />
 
           <button
-            onClick={() => document.getElementById("thermal-file")?.click()}
-            style={{ ...primaryBtn, opacity: uploading ? 0.7 : 1 }}
-            disabled={uploading}
+            onClick={() => maintInputRef.current?.click()}
+            style={{
+              marginTop: 14,
+              background: ui.primary,
+              color: "#fff",
+              border: 0,
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 14,
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 10px 25px rgba(63,81,181,.25)",
+            }}
           >
-            {uploading ? "Processing…" : "Upload thermal image"}
+            Upload thermal image
           </button>
-
-          {/* Progress */}
-          <div style={{ marginTop: 20 }}>
-            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10, color: color.text }}>Progress</div>
-            <ProgressRow title="Thermal Image Upload" status={stepUpload} />
-            <ProgressRow title="AI Analysis" status={stepAI} />
-            <ProgressRow title="Thermal Image Review" status={stepReview} />
-          </div>
         </div>
 
-        {/* RIGHT COLUMN:*/}
-        <div></div>
+        {/* RIGHT: Comparison panel */}
+        <div
+          style={{
+            background: ui.card,
+            border: `1px solid ${ui.border}`,
+            borderRadius: 16,
+            boxShadow: ui.shadow,
+            padding: 16,
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Thermal Image Comparison</div>
+
+          {baselineUrl || maintUrl ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+                alignItems: "stretch",
+              }}
+            >
+              {/* Baseline */}
+              <Figure title="Baseline" date={baselineMeta?.uploadedAt}>
+                {baselineUrl ? (
+                  <img
+                    src={baselineUrl}
+                    alt="Baseline"
+                    style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 12 }}
+                  />
+                ) : (
+                  <EmptySlot text="No baseline image" />
+                )}
+              </Figure>
+
+              {/* Current Maintenance Image */}
+              <Figure title="Current" date={maintMeta?.uploadedAt}>
+                {maintUrl ? (
+                  <img
+                    src={maintUrl}
+                    alt="Current"
+                    style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 12 }}
+                  />
+                ) : (
+                  <EmptySlot text="No maintenance image" />
+                )}
+              </Figure>
+            </div>
+          ) : (
+            <div style={{ color: ui.sub, fontWeight: 700 }}>
+              Upload a Baseline and a Maintenance image to see the side-by-side comparison.
+            </div>
+          )}
+        </div>
       </div>
 
-      <div style={{ height: 28 }} />
-      <footer style={{ color: color.subtext, fontSize: 12, fontWeight: 700, padding: "0 28px" }}>
+      {/*  */}
+      {error && (
+        <div style={{ marginTop: 16, color: ui.danger, fontWeight: 800 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Uploading modal */}
+      {showUpload && (
+        <div
+          role="dialog"
+          onClick={cancelUpload}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.45)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 100,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(820px, 92vw)",
+              background: "#fff",
+              borderRadius: 16,
+              padding: 24,
+              boxShadow: ui.shadow,
+              border: `1px solid ${ui.border}`,
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 900, textAlign: "center", marginBottom: 6 }}>
+              Thermal image uploading.
+            </div>
+            <div style={{ color: ui.sub, textAlign: "center", marginBottom: 16, fontWeight: 700 }}>
+              Thermal image is being uploaded and Reviewed.
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  height: 10,
+                  borderRadius: 999,
+                  background: "#e5e7eb",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${uploadPct}%`,
+                    background: ui.primary,
+                    transition: "width .2s ease",
+                  }}
+                />
+              </div>
+              <div style={{ width: 60, textAlign: "right", fontWeight: 800, color: ui.sub }}>{uploadPct}%</div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+              <button
+                onClick={cancelUpload}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: `1px solid ${ui.border}`,
+                  background: "#fff",
+                  fontWeight: 800,
+                  color: "#334155",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer style={{ marginTop: 24, color: "#64748b", fontSize: 12 }}>
         © 2025 TransTrack • University of Moratuwa
       </footer>
     </div>
   );
 }
 
-/* Helpers  */
-
-function Chip({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={chip}>
-      <div style={{ fontWeight: 900, color: "#111827" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 700 }}>{label}</div>
-    </div>
-  );
+/* Tiny UI bits */
+function iconBtn(disabled: boolean, danger?: boolean): React.CSSProperties {
+  return {
+    width: 30,
+    height: 30,
+    display: "grid",
+    placeItems: "center",
+    background: "#fff",
+    border: "1px solid #e0e7ff",
+    borderRadius: 8,
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 16,
+    lineHeight: 1,
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+    opacity: disabled ? 0.5 : 1,
+    color: danger ? "#dc2626" : "#4338ca",
+  };
 }
 
-function ProgressRow({ title, status }: { title: string; status: Status }) {
-  const barColor =
-    status === "Completed" ? "#16a34a" : status === "In Progress" ? "#ca8a04" : "#e5e7eb";
-  const textColor =
-    status === "Completed" ? "#16a34a" : status === "In Progress" ? "#ca8a04" : "#9ca3af";
-
+function Figure({
+  title,
+  date,
+  children,
+  badgeRight,
+  badgeColor,
+}: {
+  title: string;
+  date?: string;
+  children: React.ReactNode;
+  badgeRight?: string;
+  badgeColor?: string;
+}) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", alignItems: "center", gap: 10, marginBottom: 12 }}>
-      <span style={{ width: 8, height: 8, borderRadius: 999, background: barColor }} />
-      <div style={{ height: 6, background: "#f1f5f9", borderRadius: 999 }}>
-        <div
+    <div
+      style={{
+        background: "#0b1a4a",
+        borderRadius: 16,
+        padding: 10,
+        minHeight: 360,
+        display: "grid",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span
           style={{
-            height: 6,
-            width: status === "Completed" ? "100%" : status === "In Progress" ? "55%" : "8%",
-            background: barColor,
+            background: "#111827",
+            color: "#fff",
+            fontSize: 12,
+            padding: "4px 8px",
             borderRadius: 999,
-            transition: "width .4s ease",
+            opacity: 0.85,
+            fontWeight: 800,
           }}
-        />
+        >
+          {title}
+        </span>
+        {badgeRight && (
+          <span
+            style={{
+              background: badgeColor ?? "#111827",
+              color: "#fff",
+              fontSize: 12,
+              padding: "4px 8px",
+              borderRadius: 999,
+              opacity: 0.9,
+              fontWeight: 800,
+            }}
+          >
+            {badgeRight}
+          </span>
+        )}
       </div>
-      <span style={{ fontWeight: 800, color: textColor, fontSize: 13 }}>{status}</span>
+      <div
+        style={{
+          background: "#0b1a4a",
+          borderRadius: 12,
+          display: "grid",
+          placeItems: "center",
+          overflow: "hidden",
+        }}
+      >
+        {children}
+      </div>
+      <div style={{ color: "#cbd5e1", fontSize: 12, marginTop: 6, textAlign: "right" }}>
+        {date ? new Date(date).toLocaleString() : ""}
+      </div>
     </div>
   );
 }
 
+function EmptySlot({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: 320,
+        display: "grid",
+        placeItems: "center",
+        color: "#cbd5e1",
+        fontWeight: 700,
+      }}
+    >
+      {text}
+    </div>
+  );
+}
