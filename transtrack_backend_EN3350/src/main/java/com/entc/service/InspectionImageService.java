@@ -25,6 +25,12 @@ public class InspectionImageService {
     private final InspectionRepository inspectionRepo;
     private final InspectionImageRepository imageRepo;
     private final StorageService storage;
+    
+    public InspectionImageService(InspectionRepository inspectionRepo,InspectionImageRepository imageRepo,StorageService storage) {
+    	this.inspectionRepo = inspectionRepo;
+    	this.imageRepo = imageRepo;
+		this.storage = storage;
+    }
 
     @Transactional
     public List<InspectionImage> upload(Long inspectionId,

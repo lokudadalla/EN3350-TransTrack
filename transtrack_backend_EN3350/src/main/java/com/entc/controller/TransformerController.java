@@ -57,7 +57,7 @@ public class TransformerController {
 
 	        // Build Location header safely
 	        URI location = uriBuilder
-	                .path("/api/transformers/{id}")
+	                .path("/transformers")
 	                .buildAndExpand(saved.getId())
 	                .toUri();
 

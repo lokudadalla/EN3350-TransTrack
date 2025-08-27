@@ -4,6 +4,8 @@ import com.entc.dao.EnvironmentCondition;
 import com.entc.dto.InspectionImageDto;
 import com.entc.dao.ImageType;
 import com.entc.service.InspectionImageService;
+import com.entc.service.TransformerService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -24,6 +26,10 @@ import java.util.List;
 public class InspectionImageController {
 
     private final InspectionImageService imageService;
+    
+    public InspectionImageController(InspectionImageService imageService) {
+        this.imageService = imageService;
+    }
 
     // POST /inspections/{id}/images?type=BASELINE  (files as "files")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

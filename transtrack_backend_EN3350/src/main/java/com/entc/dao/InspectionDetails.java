@@ -51,4 +51,60 @@ public class InspectionDetails {
             createdAt = LocalDateTime.now();
         }
     }
+
+	public Long getInspectionNo() {
+		return inspectionNo;
+	}
+
+	public void setInspectionNo(Long inspectionNo) {
+		this.inspectionNo = inspectionNo;
+	}
+
+	public String getTransformerNo() {
+		return transformerNo;
+	}
+
+	public void setTransformerNo(String transformerNo) {
+		this.transformerNo = transformerNo;
+	}
+
+	public String getBranch() {
+		return branch;
+	}
+
+	public void setBranch(String branch) {
+		this.branch = branch;
+	}
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
+	}
+
+	public LocalDate getInspectionDate() {
+		return inspectionDate;
+	}
+
+	public void setInspectionDate(LocalDate inspectionDate) {
+		this.inspectionDate = inspectionDate;
+	}
+
+	public LocalTime getInspectionTime() {
+		return inspectionTime;
+	}
+
+	public void setInspectionTime(LocalTime inspectionTime) {
+		this.inspectionTime = inspectionTime;
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
+	}
 }
