@@ -1,3 +1,4 @@
+// src/pages/InspectionsPage.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTransformerByNo } from "../api/transformers";
@@ -142,7 +143,13 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText}${text ? ` — ${text}` : ""}`);
+  }
+  if (res.status === 204) return undefined as unknown as T;
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) return undefined as unknown as T;
   return res.json() as Promise<T>;
 }
 
@@ -161,6 +168,12 @@ const InspectionsAPI = {
   },
   getById(id: number) {
     return http<InspectionDTO>(`/inspections/${id}`);
+  },
+  update(id: number, payload: InspectionDTO) {
+    return http<InspectionDTO>(`/inspections/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
   },
 };
 
@@ -191,51 +204,6 @@ function mapDTOtoUI(d: InspectionDTO): Inspection {
   };
 }
 
-function parseDisplayDateToISO(s: string): string {
-  try {
-    const m = s.match(/^[A-Za-z]{3}\((\d{1,2})\),\s*([A-Za-z]+),\s*(\d{4})/);
-    if (!m) throw new Error("no match");
-    const day = m[1].padStart(2, "0");
-    const monthName = m[2].toLowerCase();
-    const year = m[3];
-    const monthMap: Record<string, string> = {
-      january: "01",
-      february: "02",
-      march: "03",
-      april: "04",
-      may: "05",
-      june: "06",
-      july: "07",
-      august: "08",
-      september: "09",
-      october: "10",
-      november: "11",
-      december: "12",
-    };
-    const mm = monthMap[monthName];
-    if (!mm) throw new Error("bad month");
-    return `${year}-${mm}-${day}`;
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-}
-
-function parseDisplayTimeToHHMMSS(s: string): string {
-  try {
-    const t = s.trim().toLowerCase();
-    const m = t.match(/^(\d{1,2})[.:](\d{2})(am|pm)$/);
-    if (!m) throw new Error("no match");
-    let h = parseInt(m[1], 10);
-    const min = m[2];
-    const ampm = m[3];
-    if (ampm === "pm" && h !== 12) h += 12;
-    if (ampm === "am" && h === 12) h = 0;
-    return `${String(h).padStart(2, "0")}:${min}:00`;
-  } catch {
-    return "07:00:00";
-  }
-}
-
 async function resolveImageUrl(inspectionId: number, meta: ImageMeta, setUrl: (u: string) => void) {
   try {
     if (meta.url) {
@@ -264,8 +232,8 @@ export default function InspectionsPage() {
 
   const [openModal, setOpenModal] = useState(false);
   const [branch, setBranch] = useState("Nugegoda");
-  const [dateStr, setDateStr] = useState("Mon(21), May, 2023");
-  const [timeStr, setTimeStr] = useState("7.00am");
+  const [dateStr, setDateStr] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [timeStr, setTimeStr] = useState<string>("07:00");
 
   const baseTransformer: TransformerMeta = useMemo(
     () => ({
@@ -286,6 +254,14 @@ export default function InspectionsPage() {
 
   const baseInputRef = useRef<HTMLInputElement | null>(null);
   const activeXhr = useRef<XMLHttpRequest | null>(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editBranch, setEditBranch] = useState<string>("Nugegoda");
+  const [editStatus, setEditStatus] = useState<Status>("Pending");
+  const [editDate, setEditDate] = useState<string>("");
+  const [editTime, setEditTime] = useState<string>("07:00");
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -326,7 +302,7 @@ export default function InspectionsPage() {
           const at =
             new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
             new Date(a.createdAt).getTime();
-          const bt =
+        const bt =
             new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
             new Date(b.createdAt).getTime();
           return bt - at;
@@ -451,8 +427,8 @@ export default function InspectionsPage() {
     e.preventDefault();
     if (!transformerId) return;
     try {
-      const inspectionDate = parseDisplayDateToISO(dateStr);
-      const inspectionTime = parseDisplayTimeToHHMMSS(timeStr);
+      const inspectionDate = dateStr;
+      const inspectionTime = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
       const created = await InspectionsAPI.create({
         transformerNo: transformerId,
         branch,
@@ -470,6 +446,57 @@ export default function InspectionsPage() {
       setOpenModal(false);
     } catch (err: any) {
       alert(err?.message ?? "Create failed");
+    }
+  }
+
+  // edit inspection
+  async function openEditFor(row: Inspection) {
+    try {
+      const id = Number(row.inspectionNo);
+      setEditOpen(true);
+      setEditLoading(true);
+      setEditId(id);
+      const dto = await InspectionsAPI.getById(id);
+      setEditBranch(dto.branch);
+      setEditStatus((dto.status as Status) || "Pending");
+      setEditDate(dto.inspectionDate);
+      setEditTime((dto.inspectionTime || "07:00:00").slice(0, 5));
+    } catch (e: any) {
+      alert(e?.message ?? "Load failed");
+      setEditOpen(false);
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editId) return;
+    try {
+      const current = await InspectionsAPI.getById(editId);
+      const payload: InspectionDTO = {
+        inspectionNo: editId,
+        transformerNo: current.transformerNo,
+        branch: editBranch,
+        status: editStatus,
+        inspectionDate: editDate,
+        inspectionTime: editTime.length === 5 ? `${editTime}:00` : editTime,
+        createdAt: current.createdAt,
+      };
+      const updated = await InspectionsAPI.update(editId, payload);
+      const mapped = mapDTOtoUI(updated);
+      setInspections((prev) =>
+        prev
+          .map((r) => (r.inspectionNo === pad8(editId) ? { ...r, ...mapped } : r))
+          .sort((a, b) => {
+            const at = new Date(a.inspectedDate).getTime();
+            const bt = new Date(b.inspectedDate).getTime();
+            return bt - at;
+          })
+      );
+      setEditOpen(false);
+    } catch (err: any) {
+      alert(err?.message ?? "Save failed");
     }
   }
 
@@ -726,6 +753,21 @@ export default function InspectionsPage() {
                         View
                       </button>
                       <button
+                        onClick={() => openEditFor(row)}
+                        style={{
+                          background: "#111827",
+                          color: "#fff",
+                          border: 0,
+                          padding: "8px 16px",
+                          borderRadius: 12,
+                          fontWeight: 800,
+                          cursor: "pointer",
+                          boxShadow: "0 6px 18px rgba(17,24,39,.25)",
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
                         onClick={() =>
                           setInspections((prev) => prev.filter((r) => r.inspectionNo !== row.inspectionNo))
                         }
@@ -819,9 +861,9 @@ export default function InspectionsPage() {
                     Date of Inspection
                   </label>
                   <input
+                    type="date"
                     value={dateStr}
                     onChange={(e) => setDateStr(e.target.value)}
-                    placeholder="Mon(21), May, 2023"
                     style={{
                       width: "100%",
                       padding: "12px 14px",
@@ -833,9 +875,9 @@ export default function InspectionsPage() {
                 <div>
                   <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>Time</label>
                   <input
+                    type="time"
                     value={timeStr}
                     onChange={(e) => setTimeStr(e.target.value)}
-                    placeholder="7.00am"
                     style={{
                       width: "100%",
                       padding: "12px 14px",
@@ -853,6 +895,144 @@ export default function InspectionsPage() {
                 <button
                   type="button"
                   onClick={() => setOpenModal(false)}
+                  style={{
+                    padding: "12px 18px",
+                    borderRadius: 14,
+                    border: `1px solid ${ui.border}`,
+                    background: "#fff",
+                    fontWeight: 800,
+                    color: "#334155",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editOpen && (
+        <div
+          role="dialog"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.45)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 100,
+          }}
+          onClick={() => setEditOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(720px, 92vw)",
+              background: "#fff",
+              borderRadius: 16,
+              padding: 20,
+              boxShadow: ui.shadow,
+              border: `1px solid ${ui.border}`,
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Edit Inspection</div>
+            <form onSubmit={saveEdit} style={{ display: "grid", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                  Branch
+                </label>
+                <select
+                  value={editBranch}
+                  onChange={(e) => setEditBranch(e.target.value)}
+                  disabled={editLoading}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: `1px solid ${ui.border}`,
+                    background: "#fff",
+                    fontWeight: 700,
+                    color: "#334155",
+                  }}
+                >
+                  {REGIONS_SL.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    disabled={editLoading}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: `1px solid ${ui.border}`,
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    disabled={editLoading}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: `1px solid ${ui.border}`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                  Status
+                </label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as Status)}
+                  disabled={editLoading}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: `1px solid ${ui.border}`,
+                    background: "#fff",
+                    fontWeight: 700,
+                    color: "#334155",
+                  }}
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
+                <button type="submit" disabled={editLoading} style={{ ...primaryBtn, boxShadow: "0 12px 28px rgba(63,81,181,.3)" }}>
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(false)}
+                  disabled={editLoading}
                   style={{
                     padding: "12px 18px",
                     borderRadius: 14,
