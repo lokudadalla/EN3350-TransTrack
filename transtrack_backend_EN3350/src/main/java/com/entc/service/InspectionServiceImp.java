@@ -31,6 +31,9 @@ public class InspectionServiceImp implements InspectionService {
     public InspectionDetails create(InspectionDetails toCreate) {
         // Ensure client cannot force an ID
         toCreate.setInspectionNo(null);
+        if (toCreate.getMaintenanceDate() == null) {
+            toCreate.setMaintenanceDate("-");
+        }
         return inspectionRepository.save(toCreate);
     }
 
@@ -59,6 +62,9 @@ public class InspectionServiceImp implements InspectionService {
             }
             if (body.getInspectionDate() != null) {
                 existing.setInspectionDate(body.getInspectionDate());
+            }
+            if (body.getMaintenanceDate() != null) {
+                existing.setMaintenanceDate(body.getMaintenanceDate());
             }
             return inspectionRepository.save(existing);
         }).orElse(null);
