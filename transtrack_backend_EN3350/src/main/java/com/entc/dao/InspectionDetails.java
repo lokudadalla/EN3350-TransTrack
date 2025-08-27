@@ -110,4 +110,15 @@ public class InspectionDetails {
 	public void setCreatedAt(LocalDateTime createdAt) {
 		this.createdAt = createdAt;
 	}
+
+	public String getMaintenanceDate() {
+		return maintenanceDate;
+	}
+
+	public void setMaintenanceDate(String maintenanceDate) {
+		this.maintenanceDate = maintenanceDate;
+	}
+
+	
+	
 }
