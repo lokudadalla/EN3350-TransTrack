@@ -40,6 +40,8 @@ public class InspectionDetails {
     @Column(name = "inspection_time")
     private LocalTime inspectionTime;
 
+    //TODO: Add inspected by:
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
