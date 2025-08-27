@@ -210,10 +210,11 @@ function formatDateOnly(dateISO?: string) {
 }
 
 function mapDTOtoUI(d: InspectionDTO): Inspection {
+  const rawMaint = d.maintenanceDate && d.maintenanceDate !== "-" ? d.maintenanceDate : "";
   return {
     inspectionNo: pad8(d.inspectionNo),
     inspectedDate: joinDateTime(d.inspectionDate, d.inspectionTime),
-    maintenanceDate: d.maintenanceDate ? formatDateOnly(d.maintenanceDate) : "-",
+    maintenanceDate: rawMaint ? formatDateOnly(rawMaint) : "-",
     status: (d.status as Status) || "Pending",
   };
 }
@@ -476,7 +477,7 @@ export default function InspectionsPage() {
       setEditStatus((dto.status as Status) || "Pending");
       setEditDate(dto.inspectionDate);
       setEditTime((dto.inspectionTime || "07:00:00").slice(0, 5));
-      setEditMaintDate(dto.maintenanceDate || "");
+      setEditMaintDate(dto.maintenanceDate && dto.maintenanceDate !== "-" ? dto.maintenanceDate : "");
     } catch (e: any) {
       alert(e?.message ?? "Load failed");
       setEditOpen(false);
@@ -498,7 +499,7 @@ export default function InspectionsPage() {
         inspectionDate: editDate,
         inspectionTime: editTime.length === 5 ? `${editTime}:00` : editTime,
         createdAt: current.createdAt,
-        maintenanceDate: editMaintDate || undefined,
+        maintenanceDate: editMaintDate ? editMaintDate : "-",
       };
       const updated = await InspectionsAPI.update(editId, payload);
       const mapped = mapDTOtoUI(updated);
@@ -774,7 +775,7 @@ export default function InspectionsPage() {
                   </td>
                   <td style={{ padding: "16px 18px", fontWeight: 900 }}>{row.inspectionNo}</td>
                   <td style={{ padding: "16px 18px" }}>{row.inspectedDate}</td>
-                  <td style={{ padding: "16px 18px", color: "#94a3b8" }}>{row.maintenanceDate ?? "-"}</td>
+                  <td style={{ padding: "16px 18px" }}>{row.maintenanceDate ?? "-"}</td>
                   <td style={{ padding: "16px 18px" }}>
                     <span style={pill(row.status)}>{row.status}</span>
                   </td>
