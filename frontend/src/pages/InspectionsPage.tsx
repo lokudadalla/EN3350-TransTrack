@@ -23,7 +23,7 @@ interface TransformerMeta {
   lastInspected: string;
 }
 
-// UI tokens
+// UI tokens ---
 const ui = {
   bg: "#f6f8fb",
   card: "#ffffff",
