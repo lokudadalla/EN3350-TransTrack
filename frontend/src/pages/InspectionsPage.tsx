@@ -1,4 +1,3 @@
-// src/pages/InspectionsPage.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTransformerByNo } from "../api/transformers";
@@ -119,6 +118,7 @@ type InspectionDTO = {
   inspectionDate: string;
   inspectionTime: string;
   createdAt: string;
+  maintenanceDate?: string;
 };
 
 type ImageType = "BASELINE" | "MAINTENANCE";
@@ -175,6 +175,9 @@ const InspectionsAPI = {
       body: JSON.stringify(payload),
     });
   },
+  remove(id: number) {
+    return http<void>(`/inspections/${id}`, { method: "DELETE" });
+  },
 };
 
 // Mappers & formatters
@@ -195,11 +198,22 @@ function joinDateTime(dateISO: string, time: string): string {
   });
 }
 
+function formatDateOnly(dateISO?: string) {
+  if (!dateISO) return "-";
+  const d = new Date(`${dateISO}T00:00:00`);
+  return d.toLocaleString("en-US", {
+    weekday: "short",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function mapDTOtoUI(d: InspectionDTO): Inspection {
   return {
     inspectionNo: pad8(d.inspectionNo),
     inspectedDate: joinDateTime(d.inspectionDate, d.inspectionTime),
-    maintenanceDate: "-",
+    maintenanceDate: d.maintenanceDate ? formatDateOnly(d.maintenanceDate) : "-",
     status: (d.status as Status) || "Pending",
   };
 }
@@ -261,9 +275,8 @@ export default function InspectionsPage() {
   const [editStatus, setEditStatus] = useState<Status>("Pending");
   const [editDate, setEditDate] = useState<string>("");
   const [editTime, setEditTime] = useState<string>("07:00");
-  const [editLoading, setEditLoading] = useState(false);
   const [editMaintDate, setEditMaintDate] = useState<string>("");
-  const [editMaintTime, setEditMaintTime] = useState<string>("");
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -304,7 +317,7 @@ export default function InspectionsPage() {
           const at =
             new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
             new Date(a.createdAt).getTime();
-        const bt =
+          const bt =
             new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
             new Date(b.createdAt).getTime();
           return bt - at;
@@ -463,12 +476,7 @@ export default function InspectionsPage() {
       setEditStatus((dto.status as Status) || "Pending");
       setEditDate(dto.inspectionDate);
       setEditTime((dto.inspectionTime || "07:00:00").slice(0, 5));
-      setEditMaintDate("");
-      setEditMaintTime("");
-      if (row.maintenanceDate && row.maintenanceDate !== "-") {
-        setEditMaintDate("");
-        setEditMaintTime("");
-      }
+      setEditMaintDate(dto.maintenanceDate || "");
     } catch (e: any) {
       alert(e?.message ?? "Load failed");
       setEditOpen(false);
@@ -490,22 +498,13 @@ export default function InspectionsPage() {
         inspectionDate: editDate,
         inspectionTime: editTime.length === 5 ? `${editTime}:00` : editTime,
         createdAt: current.createdAt,
+        maintenanceDate: editMaintDate || undefined,
       };
       const updated = await InspectionsAPI.update(editId, payload);
       const mapped = mapDTOtoUI(updated);
       setInspections((prev) =>
         prev
-          .map((r) => {
-            if (r.inspectionNo !== pad8(editId)) return r;
-            const merged: Inspection = { ...r, ...mapped };
-            if (editMaintDate && editMaintTime) {
-              const mt = editMaintTime.length === 5 ? `${editMaintTime}:00` : editMaintTime;
-              merged.maintenanceDate = joinDateTime(editMaintDate, mt);
-            } else {
-              merged.maintenanceDate = r.maintenanceDate ?? "-";
-            }
-            return merged;
-          })
+          .map((r) => (r.inspectionNo === pad8(editId) ? { ...r, ...mapped } : r))
           .sort((a, b) => {
             const at = new Date(a.inspectedDate).getTime();
             const bt = new Date(b.inspectedDate).getTime();
@@ -515,6 +514,32 @@ export default function InspectionsPage() {
       setEditOpen(false);
     } catch (err: any) {
       alert(err?.message ?? "Save failed");
+    }
+  }
+
+  async function removeInspection(row: Inspection) {
+    try {
+      if (!confirm("Delete this inspection?")) return;
+      const id = Number(row.inspectionNo);
+
+      const types: ImageType[] = ["BASELINE", "MAINTENANCE"];
+      for (const t of types) {
+        const r = await fetch(api(`/inspections/${id}/images?type=${t}`));
+        if (r.ok) {
+          const imgs: ImageMeta[] = await r.json();
+          await Promise.all(
+            (imgs || []).map((m) =>
+              fetch(api(`/inspections/${id}/images/${m.id}`), { method: "DELETE" })
+            )
+          );
+        }
+      }
+
+      await InspectionsAPI.remove(id);
+      setInspections((prev) => prev.filter((r) => r.inspectionNo !== row.inspectionNo));
+      setOwnedInspectionIds((prev) => prev.filter((n) => n !== id));
+    } catch (e: any) {
+      alert(e?.message ?? "Delete failed");
     }
   }
 
@@ -773,22 +798,20 @@ export default function InspectionsPage() {
                       <button
                         onClick={() => openEditFor(row)}
                         style={{
-                          background: "#111827",
-                          color: "#fff",
-                          border: 0,
+                          background: "#fff",
+                          color: "#111827",
+                          border: `1px solid ${ui.border}`,
                           padding: "8px 16px",
                           borderRadius: 12,
                           fontWeight: 800,
                           cursor: "pointer",
-                          boxShadow: "0 6px 18px rgba(17,24,39,.25)",
+                          boxShadow: "0 6px 18px rgba(17,24,39,.08)",
                         }}
                       >
                         Edit
                       </button>
                       <button
-                        onClick={() =>
-                          setInspections((prev) => prev.filter((r) => r.inspectionNo !== row.inspectionNo))
-                        }
+                        onClick={() => removeInspection(row)}
                         style={ghostDangerBtn}
                       >
                         Delete
@@ -1043,41 +1066,22 @@ export default function InspectionsPage() {
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
-                    Maintenance Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editMaintDate}
-                    onChange={(e) => setEditMaintDate(e.target.value)}
-                    disabled={editLoading}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: 12,
-                      border: `1px solid ${ui.border}`,
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
-                    Maintenance Time
-                  </label>
-                  <input
-                    type="time"
-                    value={editMaintTime}
-                    onChange={(e) => setEditMaintTime(e.target.value)}
-                    disabled={editLoading}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: 12,
-                      border: `1px solid ${ui.border}`,
-                    }}
-                  />
-                </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+                  Maintenance Date
+                </label>
+                <input
+                  type="date"
+                  value={editMaintDate}
+                  onChange={(e) => setEditMaintDate(e.target.value)}
+                  disabled={editLoading}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: `1px solid ${ui.border}`,
+                  }}
+                />
               </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 6 }}>

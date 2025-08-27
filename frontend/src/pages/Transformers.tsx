@@ -471,11 +471,11 @@ export default function Transformers() {
                               padding: "6px 10px",
                               borderRadius: 10,
                               cursor: "pointer",
-                              fontSize: 16,
+                              fontSize: 14,
                             }}
                             title="Delete"
                           >
-                            🗑
+                            Delete
                           </button>
                         )}
                       </div>
