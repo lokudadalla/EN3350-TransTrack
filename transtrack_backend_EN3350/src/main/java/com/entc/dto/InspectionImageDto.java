@@ -26,10 +26,19 @@ public class InspectionImageDto {
         return new InspectionImageDto(i.getId(), i.getType(), i.getFileName(), i.getContentType(), i.getSize(), i.getUploadedAt(), url, i.getUploader(), i.getCondition());
     }
 
-	public InspectionImageDto() {
-		super();
-		// TODO Auto-generated constructor stub
-	}
+    public InspectionImageDto(Long id, ImageType type, String fileName,
+            String contentType, long size, LocalDateTime uploadedAt,
+            String url, String uploader, EnvironmentCondition condition) {
+			this.id = id;
+			this.type = type;
+			this.fileName = fileName;
+			this.contentType = contentType;
+			this.size = size;
+			this.uploadedAt = uploadedAt;
+			this.url = url;
+			this.uploader = uploader;
+			this.condition = condition;
+			}
 
 	public EnvironmentCondition getCondition() {
 		return condition;
