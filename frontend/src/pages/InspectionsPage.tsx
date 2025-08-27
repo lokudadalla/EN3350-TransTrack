@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTransformerByNo } from "../api/transformers";
-import { REGIONS_SL } from "../constants/regions"; 
+import { REGIONS_SL } from "../constants/regions";
 
 // Types
 type Status = "Completed" | "In Progress" | "Pending";
@@ -15,7 +15,7 @@ interface Inspection {
 }
 
 interface TransformerMeta {
-  id: string;                  // Transformer No
+  id: string;
   poleNo: string;
   type: "Bulk" | "Distribution";
   region: string;
@@ -114,13 +114,28 @@ type InspectionDTO = {
   inspectionNo: number;
   transformerNo: string;
   branch: string;
-  status: string;          // "Pending" | "In Progress" | "Completed"
-  inspectionDate: string;  // "YYYY-MM-DD"
-  inspectionTime: string;  // "HH:mm:ss"
-  createdAt: string;       // ISO
+  status: string;
+  inspectionDate: string;
+  inspectionTime: string;
+  createdAt: string;
+};
+
+type ImageType = "BASELINE" | "MAINTENANCE";
+type Condition = "SUNNY" | "CLOUDY" | "RAINY";
+type ImageMeta = {
+  id: number;
+  type: ImageType;
+  fileName: string;
+  contentType: string;
+  size?: number;
+  uploadedAt: string;
+  url?: string;
+  uploader?: string;
+  condition?: Condition;
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const api = (p: string) => `${API_BASE}${p}`;
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -184,8 +199,18 @@ function parseDisplayDateToISO(s: string): string {
     const monthName = m[2].toLowerCase();
     const year = m[3];
     const monthMap: Record<string, string> = {
-      january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
-      july: "07", august: "08", september: "09", october: "10", november: "11", december: "12",
+      january: "01",
+      february: "02",
+      march: "03",
+      april: "04",
+      may: "05",
+      june: "06",
+      july: "07",
+      august: "08",
+      september: "09",
+      october: "10",
+      november: "11",
+      december: "12",
     };
     const mm = monthMap[monthName];
     if (!mm) throw new Error("bad month");
@@ -211,19 +236,34 @@ function parseDisplayTimeToHHMMSS(s: string): string {
   }
 }
 
+async function resolveImageUrl(inspectionId: number, meta: ImageMeta, setUrl: (u: string) => void) {
+  try {
+    if (meta.url) {
+      const full = meta.url.startsWith("http") ? meta.url : `${API_BASE}${meta.url}`;
+      setUrl(full);
+      return;
+    }
+    const res = await fetch(api(`/inspections/${inspectionId}/images/${meta.id}/file`));
+    if (!res.ok) throw new Error("failed");
+    const blob = await res.blob();
+    setUrl(URL.createObjectURL(blob));
+  } catch {
+    setUrl("");
+  }
+}
+
 // Component
 export default function InspectionsPage() {
   const navigate = useNavigate();
   const { transformerId } = useParams<{ transformerId: string }>();
 
   const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [ownedInspectionIds, setOwnedInspectionIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-  const [baselineUrl, setBaselineUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // modal state
   const [openModal, setOpenModal] = useState(false);
-  const [branch, setBranch] = useState("Nugegoda"); 
+  const [branch, setBranch] = useState("Nugegoda");
   const [dateStr, setDateStr] = useState("Mon(21), May, 2023");
   const [timeStr, setTimeStr] = useState("7.00am");
 
@@ -239,6 +279,13 @@ export default function InspectionsPage() {
     [transformerId]
   );
   const [transformer, setTransformer] = useState<TransformerMeta>(baseTransformer);
+
+  const [baselineMeta, setBaselineMeta] = useState<ImageMeta | null>(null);
+  const [baselineUrl, setBaselineUrl] = useState<string | null>(null);
+  const [baselineOwnerInspectionId, setBaselineOwnerInspectionId] = useState<number | null>(null);
+
+  const baseInputRef = useRef<HTMLInputElement | null>(null);
+  const activeXhr = useRef<XMLHttpRequest | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -257,9 +304,7 @@ export default function InspectionsPage() {
           }));
         }
       } catch (e: any) {
-        if (!cancelled) {
-          setError((old) => old ?? "Failed to load transformer details");
-        }
+        if (!cancelled) setError((old) => old ?? "Failed to load transformer details");
       }
     }
     loadTransformer();
@@ -271,16 +316,12 @@ export default function InspectionsPage() {
   //Load inspections from backend
   useEffect(() => {
     let cancelled = false;
-
     async function loadInspections() {
       if (!transformerId) return;
       setLoading(true);
       setError(null);
       try {
-        // fetch only this transformer’s inspections
         const mine = await InspectionsAPI.listByTransformerNo(transformerId);
-
-        // sort newest first
         mine.sort((a, b) => {
           const at =
             new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
@@ -290,11 +331,10 @@ export default function InspectionsPage() {
             new Date(b.createdAt).getTime();
           return bt - at;
         });
-
         const rows = mine.map(mapDTOtoUI);
-
         if (!cancelled) {
           setInspections(rows);
+          setOwnedInspectionIds(mine.map((m) => m.inspectionNo));
           setTransformer((t) => ({
             ...t,
             lastInspected: mine[0]
@@ -302,17 +342,44 @@ export default function InspectionsPage() {
               : "-",
           }));
         }
+        const metas: { meta: ImageMeta; owner: number }[] = await Promise.all(
+          mine.map(async (m) => {
+            const r = await fetch(api(`/inspections/${m.inspectionNo}/images?type=BASELINE`));
+            if (!r.ok) return null as any;
+            const arr: ImageMeta[] = await r.json();
+            const latest =
+              arr?.slice().sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0] ??
+              null;
+            return latest ? { meta: latest, owner: m.inspectionNo } : null;
+          })
+        ).then((x) => x.filter(Boolean) as { meta: ImageMeta; owner: number }[]);
+        if (!cancelled) {
+          if (metas.length) {
+            metas.sort(
+              (a, b) =>
+                new Date(b.meta.uploadedAt).getTime() - new Date(a.meta.uploadedAt).getTime()
+            );
+            const pick = metas[0];
+            setBaselineMeta(pick.meta);
+            setBaselineOwnerInspectionId(pick.owner);
+            resolveImageUrl(pick.owner, pick.meta, (u) => setBaselineUrl(u));
+          } else {
+            setBaselineMeta(null);
+            setBaselineOwnerInspectionId(null);
+            setBaselineUrl(null);
+          }
+        }
       } catch (e: any) {
         if (!cancelled) {
           setError(e?.message ?? "Failed to load inspections");
           setInspections([]);
+          setOwnedInspectionIds([]);
           setTransformer((t) => ({ ...t, lastInspected: "-" }));
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-
     loadInspections();
     return () => {
       cancelled = true;
@@ -323,16 +390,60 @@ export default function InspectionsPage() {
   function onPickBaseline(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    const url = URL.createObjectURL(f);
-    if (baselineUrl) URL.revokeObjectURL(baselineUrl);
-    setBaselineUrl(url);
+    const targetInspectionId = ownedInspectionIds[0];
+    if (!targetInspectionId) {
+      alert("Please create an inspection first.");
+      e.currentTarget.value = "";
+      return;
+    }
+    const urlObj = new URL(api(`/inspections/${targetInspectionId}/images`));
+    urlObj.searchParams.set("type", "BASELINE");
+    urlObj.searchParams.set("uploader", "web");
+    urlObj.searchParams.set("condition", "SUNNY");
+    const fd = new FormData();
+    fd.append("files", f);
+    const xhr = new XMLHttpRequest();
+    activeXhr.current = xhr;
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const list: ImageMeta[] = JSON.parse(xhr.responseText);
+          const latest = list?.[0];
+          setBaselineMeta(latest || null);
+          setBaselineOwnerInspectionId(targetInspectionId);
+          if (latest) resolveImageUrl(targetInspectionId, latest, (u) => setBaselineUrl(u));
+        } catch {}
+      } else {
+        alert(`Upload error (HTTP ${xhr.status})`);
+      }
+      activeXhr.current = null;
+    };
+    xhr.open("POST", urlObj.toString(), true);
+    xhr.send(fd);
+    e.currentTarget.value = "";
   }
   function viewBaseline() {
+    if (!baselineMeta) return;
     if (baselineUrl) window.open(baselineUrl, "_blank");
+    else if (baselineOwnerInspectionId)
+      resolveImageUrl(baselineOwnerInspectionId, baselineMeta, (u) => window.open(u, "_blank"));
   }
-  function deleteBaseline() {
-    if (baselineUrl) URL.revokeObjectURL(baselineUrl);
-    setBaselineUrl(null);
+  async function deleteBaseline() {
+    if (!baselineMeta || !baselineOwnerInspectionId) return;
+    if (!confirm("Delete baseline image?")) return;
+    const res = await fetch(
+      api(`/inspections/${baselineOwnerInspectionId}/images/${baselineMeta.id}`),
+      { method: "DELETE" }
+    );
+    if (res.status === 204) {
+      setBaselineMeta(null);
+      setBaselineOwnerInspectionId(null);
+      if (baselineUrl?.startsWith("blob:")) URL.revokeObjectURL(baselineUrl);
+      setBaselineUrl(null);
+    } else {
+      alert("Delete failed");
+    }
   }
 
   // add inspection
@@ -342,7 +453,6 @@ export default function InspectionsPage() {
     try {
       const inspectionDate = parseDisplayDateToISO(dateStr);
       const inspectionTime = parseDisplayTimeToHHMMSS(timeStr);
-
       const created = await InspectionsAPI.create({
         transformerNo: transformerId,
         branch,
@@ -350,9 +460,9 @@ export default function InspectionsPage() {
         inspectionDate,
         inspectionTime,
       });
-
       const row = mapDTOtoUI(created);
       setInspections((prev) => [row, ...prev]);
+      setOwnedInspectionIds((prev) => [created.inspectionNo, ...prev]);
       setTransformer((t) => ({
         ...t,
         lastInspected: joinDateTime(created.inspectionDate, created.inspectionTime),
@@ -372,7 +482,6 @@ export default function InspectionsPage() {
       },
     });
   }
-
   function goBack() {
     if (window.history.length > 1) navigate(-1);
     else navigate("/transformers");
@@ -445,9 +554,10 @@ export default function InspectionsPage() {
                 cursor: "pointer",
                 minWidth: 260,
               }}
-              onClick={() => document.getElementById("baseline-upload")?.click()}
+              onClick={() => baseInputRef.current?.click()}
             >
               <input
+                ref={baseInputRef}
                 id="baseline-upload"
                 type="file"
                 accept="image/*"
@@ -478,12 +588,12 @@ export default function InspectionsPage() {
                     e.stopPropagation();
                     viewBaseline();
                   }}
-                  disabled={!baselineUrl}
+                  disabled={!baselineMeta}
                   style={{
                     ...actionIconBtn,
                     color: "#4338ca",
-                    cursor: baselineUrl ? "pointer" : "not-allowed",
-                    opacity: baselineUrl ? 1 : 0.5,
+                    cursor: baselineMeta ? "pointer" : "not-allowed",
+                    opacity: baselineMeta ? 1 : 0.5,
                   }}
                 >
                   👁️
@@ -494,12 +604,12 @@ export default function InspectionsPage() {
                     e.stopPropagation();
                     deleteBaseline();
                   }}
-                  disabled={!baselineUrl}
+                  disabled={!baselineMeta}
                   style={{
                     ...actionIconBtn,
                     color: ui.danger,
-                    cursor: baselineUrl ? "pointer" : "not-allowed",
-                    opacity: baselineUrl ? 1 : 0.5,
+                    cursor: baselineMeta ? "pointer" : "not-allowed",
+                    opacity: baselineMeta ? 1 : 0.5,
                   }}
                 >
                   🗑️
@@ -663,7 +773,6 @@ export default function InspectionsPage() {
                 <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
                   Branch
                 </label>
-                {/* Dropdown for Branch */}
                 <select
                   value={branch}
                   onChange={(e) => setBranch(e.target.value)}
@@ -773,5 +882,3 @@ function Chip({ title, value }: { title: string; value: string }) {
     </div>
   );
 }
-
-

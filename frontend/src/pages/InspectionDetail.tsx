@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-
+/* ---------- Types ---------- */
 type Status = "Completed" | "In Progress" | "Pending";
 type ImageType = "BASELINE" | "MAINTENANCE";
 type Condition = "SUNNY" | "CLOUDY" | "RAINY";
@@ -11,9 +11,9 @@ type InspectionDTO = {
   transformerNo: string;
   branch: string;
   status: string;
-  inspectionDate: string; // YYYY-MM-DD
-  inspectionTime: string; // HH:mm:ss
-  createdAt: string;      
+  inspectionDate: string;
+  inspectionTime: string;
+  createdAt: string;
 };
 
 type ImageMeta = {
@@ -22,8 +22,8 @@ type ImageMeta = {
   fileName: string;
   contentType: string;
   size?: number;
-  uploadedAt: string; // ISO
-  url?: string;       // server gives /inspections/{id}/images/{imageId}/file
+  uploadedAt: string;
+  url?: string;
   uploader?: string;
   condition?: Condition;
 };
@@ -54,12 +54,9 @@ const ui = {
   shadow: "0 10px 30px rgba(31,41,55,.08)",
 };
 
-/* Small helpers */
+/* ---------- Small helpers ---------- */
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
-
-function api(path: string) {
-  return `${API_BASE}${path}`;
-}
+const api = (p: string) => `${API_BASE}${p}`;
 
 function toNiceDateTime(d: string, t: string) {
   const dt = new Date(`${d}T${t}`);
@@ -99,28 +96,21 @@ function Chip({ title, value }: { title: string; value?: string }) {
   );
 }
 
-async function resolveImageUrl(
-  inspectionId: number,
-  meta: ImageMeta,
-  setUrl: (u: string) => void
-) {
+async function resolveImageUrl(ownerInspectionId: number, meta: ImageMeta, setUrl: (u: string) => void) {
   try {
     if (meta.url) {
       const full = meta.url.startsWith("http") ? meta.url : `${API_BASE}${meta.url}`;
       setUrl(full);
       return;
     }
-    const res = await fetch(api(`/inspections/${inspectionId}/images/${meta.id}/file`));
+    const res = await fetch(api(`/inspections/${ownerInspectionId}/images/${meta.id}/file`));
     if (!res.ok) throw new Error("Failed to fetch image");
     const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    setUrl(objectUrl);
-  } catch (e) {
-    console.error(e);
-  }
+    setUrl(URL.createObjectURL(blob));
+  } catch {}
 }
 
-/*  Page  */
+/* ---------- Page ---------- */
 export default function InspectionDetail() {
   const { transformerId, inspectionNo } = useParams<{ transformerId: string; inspectionNo: string }>();
   const navigate = useNavigate();
@@ -128,7 +118,6 @@ export default function InspectionDetail() {
 
   const numericInspectionId = useMemo(() => Number(inspectionNo), [inspectionNo]);
 
-  // Header / meta
   const [header, setHeader] = useState<TransformerHeader>({
     transformerNo: transformerId ?? "-",
     branch: "-",
@@ -138,32 +127,27 @@ export default function InspectionDetail() {
     lastUpdated: "-",
   });
 
-  // Images
   const [baselineMeta, setBaselineMeta] = useState<ImageMeta | null>(null);
-  const [maintMeta, setMaintMeta] = useState<ImageMeta | null>(null);
   const [baselineUrl, setBaselineUrl] = useState<string | null>(null);
+  const [baselineOwnerInspectionId, setBaselineOwnerInspectionId] = useState<number | null>(null);
+
+  const [maintMeta, setMaintMeta] = useState<ImageMeta | null>(null);
   const [maintUrl, setMaintUrl] = useState<string | null>(null);
 
-  // Weather condition (dropdown)
   const [condition, setCondition] = useState<Condition>("SUNNY");
 
-  // Upload modal
   const [showUpload, setShowUpload] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
-  const [uploadingType, setUploadingType] = useState<ImageType | null>(null); // kept for parity
   const activeXhr = useRef<XMLHttpRequest | null>(null);
-
 
   const [error, setError] = useState<string | null>(null);
 
-  /* Load inspection header  */
+  /* ----- Load inspection header ----- */
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         setError(null);
-
-        // prefer state passed from list page
         const fromState = (location.state as any)?.inspection;
         if (fromState?.inspectedDate) {
           setHeader((h) => ({
@@ -175,14 +159,12 @@ export default function InspectionDetail() {
             lastUpdated: fromState.inspectedDate,
           }));
         } else {
-          // fetch from backend by numeric inspection id
           const res = await fetch(api(`/inspections/${numericInspectionId}`));
           if (!res.ok) throw new Error(`Failed to load inspection ${numericInspectionId}`);
           const dto: InspectionDTO = await res.json();
-
           setHeader({
             transformerNo: dto.transformerNo,
-            poleNo: "-", 
+            poleNo: "-",
             branch: dto.branch,
             inspectedBy: "-",
             status: (dto.status as Status) || "Pending",
@@ -198,37 +180,74 @@ export default function InspectionDetail() {
     };
   }, [numericInspectionId, transformerId, location.state]);
 
-  /* Load image metadata */
+  /* ----- Load image metadata (baseline & maintenance) ----- */
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchType(t: ImageType) {
-      const res = await fetch(api(`/inspections/${numericInspectionId}/images?type=${t}`));
-      if (!res.ok) return null;
-      const list: ImageMeta[] = await res.json();
-      const latest =
-        list?.slice().sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0] ?? null;
-      return latest ?? null;
+    async function latestBaselineForTransformer(): Promise<{ meta: ImageMeta; owner: number } | null> {
+      if (!transformerId) return null;
+      const insRes = await fetch(api(`/inspections/by-no?no=${encodeURIComponent(transformerId)}`));
+      if (!insRes.ok) return null;
+      const list: InspectionDTO[] = await insRes.json();
+      list.sort((a, b) => {
+        const at =
+          new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() ||
+          new Date(a.createdAt).getTime();
+        const bt =
+          new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() ||
+          new Date(b.createdAt).getTime();
+        return bt - at;
+      });
+      const metas: { meta: ImageMeta; owner: number }[] = [];
+      for (const it of list) {
+        const r = await fetch(api(`/inspections/${it.inspectionNo}/images?type=BASELINE`));
+        if (!r.ok) continue;
+        const arr: ImageMeta[] = await r.json();
+        if (arr?.length) {
+          const latest =
+            arr.slice().sort((x, y) => new Date(y.uploadedAt).getTime() - new Date(x.uploadedAt).getTime())[0];
+          metas.push({ meta: latest, owner: it.inspectionNo });
+        }
+      }
+      if (!metas.length) return null;
+      metas.sort((a, b) => new Date(b.meta.uploadedAt).getTime() - new Date(a.meta.uploadedAt).getTime());
+      return metas[0];
+    }
+
+    async function maintenanceForThisInspection(): Promise<ImageMeta | null> {
+      const r = await fetch(api(`/inspections/${numericInspectionId}/images?type=MAINTENANCE`));
+      if (!r.ok) return null;
+      const arr: ImageMeta[] = await r.json();
+      if (!arr?.length) return null;
+      return arr.slice().sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
     }
 
     (async () => {
       if (!numericInspectionId) return;
-      const [b, m] = await Promise.all([fetchType("BASELINE"), fetchType("MAINTENANCE")]);
+      const [globalBase, maint] = await Promise.all([latestBaselineForTransformer(), maintenanceForThisInspection()]);
       if (cancelled) return;
 
-      setBaselineMeta(b);
-      setMaintMeta(m);
+      if (globalBase) {
+        setBaselineMeta(globalBase.meta);
+        setBaselineOwnerInspectionId(globalBase.owner);
+        resolveImageUrl(globalBase.owner, globalBase.meta, (u) => setBaselineUrl(u));
+      } else {
+        setBaselineMeta(null);
+        setBaselineOwnerInspectionId(null);
+        setBaselineUrl(null);
+      }
 
-      if (b) resolveImageUrl(numericInspectionId, b, (u: string) => setBaselineUrl(u));
-      if (m) resolveImageUrl(numericInspectionId, m, (u: string) => setMaintUrl(u));
+      setMaintMeta(maint);
+      if (maint) resolveImageUrl(numericInspectionId, maint, (u) => setMaintUrl(u));
+      else setMaintUrl(null);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [numericInspectionId]);
+  }, [numericInspectionId, transformerId]);
 
-  /*  Helpers: view/delete/upload */
+  /* ----- Helpers: view/delete/upload ----- */
   function goBack() {
     if (window.history.length > 1) navigate(-1);
     else navigate("/transformers");
@@ -240,66 +259,56 @@ export default function InspectionDetail() {
       window.open(url, "_blank");
       return;
     }
-    await resolveImageUrl(numericInspectionId, meta, (u: string) => window.open(u, "_blank"));
+    const owner = meta.type === "BASELINE" ? baselineOwnerInspectionId ?? numericInspectionId : numericInspectionId;
+    await resolveImageUrl(owner, meta, (u) => window.open(u, "_blank"));
   }
 
   async function remove(meta: ImageMeta | null, onDone: () => void) {
     if (!meta) return;
     if (!confirm("Delete this image?")) return;
-    const res = await fetch(api(`/inspections/${numericInspectionId}/images/${meta.id}`), { method: "DELETE" });
+    const owner = meta.type === "BASELINE" ? baselineOwnerInspectionId ?? numericInspectionId : numericInspectionId;
+    const res = await fetch(api(`/inspections/${owner}/images/${meta.id}`), { method: "DELETE" });
     if (res.status === 204) onDone();
     else alert("Delete failed");
   }
 
   function startUpload(t: ImageType, file: File) {
-    // keep your original XHR flow
-    setUploadingType(t);
     setUploadPct(0);
     setShowUpload(true);
-
     const url = new URL(api(`/inspections/${numericInspectionId}/images`));
     url.searchParams.set("type", t);
     url.searchParams.set("uploader", "web");
     url.searchParams.set("condition", condition);
-
     const fd = new FormData();
     fd.append("files", file);
-
     const xhr = new XMLHttpRequest();
     activeXhr.current = xhr;
-
     xhr.upload.onprogress = (evt) => {
       if (!evt.lengthComputable) return;
       const pct = Math.round((evt.loaded / evt.total) * 100);
       setUploadPct(pct);
     };
-
     xhr.onreadystatechange = () => {
       if (xhr.readyState !== 4) return;
-
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const list: ImageMeta[] = JSON.parse(xhr.responseText);
           const latest = list?.[0];
           if (t === "BASELINE") {
             setBaselineMeta(latest || null);
-            if (latest) resolveImageUrl(numericInspectionId, latest, (u: string) => setBaselineUrl(u));
+            setBaselineOwnerInspectionId(numericInspectionId);
+            if (latest) resolveImageUrl(numericInspectionId, latest, (u) => setBaselineUrl(u));
           } else {
             setMaintMeta(latest || null);
-            if (latest) resolveImageUrl(numericInspectionId, latest, (u: string) => setMaintUrl(u));
+            if (latest) resolveImageUrl(numericInspectionId, latest, (u) => setMaintUrl(u));
           }
-        } catch {
-          
-        }
+        } catch {}
       } else {
-        alert(`Upload error (HTTP ${xhr.status})`);
+        alert("Upload failed");
       }
-
       setShowUpload(false);
-      setUploadingType(null);
       activeXhr.current = null;
     };
-
     xhr.open("POST", url.toString(), true);
     xhr.send(fd);
   }
@@ -307,34 +316,25 @@ export default function InspectionDetail() {
   function cancelUpload() {
     activeXhr.current?.abort();
     setShowUpload(false);
-    setUploadingType(null);
     setUploadPct(0);
   }
 
-  /* Clean up object URLs when they change / unmount */
-  useEffect(() => {
-    return () => {
-      if (baselineUrl?.startsWith("blob:")) URL.revokeObjectURL(baselineUrl);
-      if (maintUrl?.startsWith("blob:")) URL.revokeObjectURL(maintUrl);
-    };
-  }, [baselineUrl, maintUrl]);
-
-  /* File pickers */
+  /* ----- File pickers ----- */
   const baseInputRef = useRef<HTMLInputElement | null>(null);
   const maintInputRef = useRef<HTMLInputElement | null>(null);
 
   function onPickBaseline(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (f) startUpload("BASELINE", f);
-    e.currentTarget.value = ""; 
+    e.currentTarget.value = "";
   }
   function onPickMaintenance(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (f) startUpload("MAINTENANCE", f);
-    e.currentTarget.value = ""; 
+    e.currentTarget.value = "";
   }
 
-  /* Render */
+  /* ----- Render ----- */
   return (
     <div style={{ background: ui.bg, minHeight: "100vh", padding: 24 }}>
       {/* HEADER CARD */}
@@ -449,7 +449,8 @@ export default function InspectionDetail() {
                     e.stopPropagation();
                     remove(baselineMeta, () => {
                       setBaselineMeta(null);
-                      if (baselineUrl?.startsWith("blob:")) URL.revokeObjectURL(baselineUrl);
+                      setBaselineOwnerInspectionId(null);
+                      if (baselineUrl) URL.revokeObjectURL(baselineUrl);
                       setBaselineUrl(null);
                     });
                   }}
@@ -463,7 +464,7 @@ export default function InspectionDetail() {
           </div>
         </div>
 
-        {/* Chips row */}
+        {/* Chips row like before */}
         <div style={{ display: "flex", gap: 14, marginTop: 16, alignItems: "stretch", flexWrap: "wrap" }}>
           <Chip title="Transformer No" value={header.transformerNo} />
           <Chip title="Pole No" value={header.poleNo} />
@@ -498,8 +499,6 @@ export default function InspectionDetail() {
             <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
               Weather Condition
             </label>
-
-            {/* Dropdown */}
             <select
               value={condition}
               onChange={(e) => setCondition(e.target.value as Condition)}
@@ -566,7 +565,6 @@ export default function InspectionDetail() {
                 alignItems: "stretch",
               }}
             >
-              {/* Baseline */}
               <Figure title="Baseline" date={baselineMeta?.uploadedAt}>
                 {baselineUrl ? (
                   <img
@@ -579,7 +577,6 @@ export default function InspectionDetail() {
                 )}
               </Figure>
 
-              {/* Current Maintenance Image */}
               <Figure title="Current" date={maintMeta?.uploadedAt}>
                 {maintUrl ? (
                   <img
@@ -600,7 +597,7 @@ export default function InspectionDetail() {
         </div>
       </div>
 
-      {/*  */}
+      {/* Error line */}
       {error && (
         <div style={{ marginTop: 16, color: ui.danger, fontWeight: 800 }}>
           {error}
@@ -686,7 +683,7 @@ export default function InspectionDetail() {
   );
 }
 
-/* Tiny UI bits */
+/* ---------- Tiny UI bits ---------- */
 function iconBtn(disabled: boolean, danger?: boolean): React.CSSProperties {
   return {
     width: 30,
