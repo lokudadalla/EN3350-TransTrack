@@ -26,6 +26,11 @@ public class InspectionImageDto {
         return new InspectionImageDto(i.getId(), i.getType(), i.getFileName(), i.getContentType(), i.getSize(), i.getUploadedAt(), url, i.getUploader(), i.getCondition());
     }
 
+	public InspectionImageDto() {
+		super();
+		// TODO Auto-generated constructor stub
+	}
+
 	public EnvironmentCondition getCondition() {
 		return condition;
 	}
