@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name="transformers")
+@Table(
+	name = "transformers",
+	uniqueConstraints = @UniqueConstraint(columnNames = {"transformer_no", "user_id"}) // optional but recommended
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -38,6 +41,9 @@ public class TransformerDetails {
 
 	    @Column(name = "created_at")
 	    private LocalDateTime createdAt;
+	    
+	    @Column(name = "user_id", nullable = false)   // <-- NEW
+	    private Long userId;     
 
 	    @PrePersist
 	    void prePersist() {
@@ -109,4 +115,13 @@ public class TransformerDetails {
 			this.createdAt = createdAt;
 		}
 
+		public Long getUserId() {
+			return userId;
+		}
+
+		public void setUserId(Long userId) {
+			this.userId = userId;
+		}
+
+		
 }

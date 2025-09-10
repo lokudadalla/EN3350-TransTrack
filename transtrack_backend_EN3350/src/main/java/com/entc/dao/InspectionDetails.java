@@ -24,6 +24,9 @@ public class InspectionDetails {
 
     @Column(name = "transformer_no")
     private String transformerNo;
+    
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(name = "branch")
     private String branch;
@@ -57,6 +60,14 @@ public class InspectionDetails {
 
 	public Long getInspectionNo() {
 		return inspectionNo;
+	}
+
+	public Long getUserId() {
+		return userId;
+	}
+
+	public void setUserId(Long userId) {
+		this.userId = userId;
 	}
 
 	public void setInspectionNo(Long inspectionNo) {
