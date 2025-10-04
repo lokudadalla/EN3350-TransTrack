@@ -24,6 +24,8 @@ class InferenceRequest(BaseModel):
     
     temperature_percent: Optional[int] = None   # e.g., 10, 20, 30, 40
 
+    cfg_overrides: Optional[Dict[str, Any]] = None
+
 def build_overrides_linear(pct: Optional[int]) -> Dict[str, Any]:
     if pct is None:
         return {}
