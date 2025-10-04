@@ -1,0 +1,13 @@
+{
+  "transformer_id": "Tx04",
+  "weather": "cloudy",
+  "baseline_image": "C:\\Users\\lokud\\Desktop\\academic works\\7th sem\\software design project\\EN3350-TransTrack\\upload\\Tx04\\T5_normal_001.png",
+  "maintenance_image": "C:\\Users\\lokud\\Desktop\\academic works\\7th sem\\software design project\\EN3350-TransTrack\\upload\\Tx04\\T4_faulty_002.png",
+  "detections": [],
+  "params_used": {
+    "low_thresh": 0.22,
+    "high_thresh": 0.4,
+    "min_area": 30,
+    "merge_radius": 8
+  }
+}

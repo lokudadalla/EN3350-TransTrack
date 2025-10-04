@@ -1,0 +1,2434 @@
+{
+  "transformer_id": "TX07",
+  "weather": "cloudy",
+  "baseline_image": "C:\\Users\\lokud\\Desktop\\academic works\\7th sem\\software design project\\EN3350-TransTrack\\upload\\Tx07\\T7_normal_001.jpg",
+  "maintenance_image": "C:\\Users\\lokud\\Desktop\\academic works\\7th sem\\software design project\\EN3350-TransTrack\\upload\\Tx07\\T7_faulty_003.jpg",
+  "detections": [
+    {
+      "id": 1,
+      "bbox": [
+        2633,
+        1754,
+        7,
+        19
+      ],
+      "score": 0.421,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.0,
+        "dwarm": 0.926,
+        "dssim": 0.021
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.926,
+        "area_px": 133
+      }
+    },
+    {
+      "id": 2,
+      "bbox": [
+        1820,
+        1764,
+        9,
+        9
+      ],
+      "score": 0.19,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.857
+      },
+      "hotspot_stats": {
+        "p90": 0.857,
+        "max": 0.857,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 3,
+      "bbox": [
+        1888,
+        1760,
+        9,
+        9
+      ],
+      "score": 0.197,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.894
+      },
+      "hotspot_stats": {
+        "p90": 0.894,
+        "max": 0.894,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 4,
+      "bbox": [
+        1868,
+        1760,
+        13,
+        9
+      ],
+      "score": 0.172,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.769
+      },
+      "hotspot_stats": {
+        "p90": 0.769,
+        "max": 0.918,
+        "area_px": 117
+      }
+    },
+    {
+      "id": 5,
+      "bbox": [
+        1856,
+        1760,
+        9,
+        9
+      ],
+      "score": 0.202,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.918
+      },
+      "hotspot_stats": {
+        "p90": 0.918,
+        "max": 0.918,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 6,
+      "bbox": [
+        1836,
+        1736,
+        13,
+        20
+      ],
+      "score": 0.176,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.781
+      },
+      "hotspot_stats": {
+        "p90": 0.781,
+        "max": 0.918,
+        "area_px": 260
+      }
+    },
+    {
+      "id": 7,
+      "bbox": [
+        1796,
+        1744,
+        29,
+        13
+      ],
+      "score": 0.17,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.75
+      },
+      "hotspot_stats": {
+        "p90": 0.75,
+        "max": 0.75,
+        "area_px": 377
+      }
+    },
+    {
+      "id": 8,
+      "bbox": [
+        1904,
+        1740,
+        17,
+        17
+      ],
+      "score": 0.199,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.894
+      },
+      "hotspot_stats": {
+        "p90": 0.894,
+        "max": 0.894,
+        "area_px": 289
+      }
+    },
+    {
+      "id": 9,
+      "bbox": [
+        1872,
+        1740,
+        13,
+        17
+      ],
+      "score": 0.153,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.666
+      },
+      "hotspot_stats": {
+        "p90": 0.666,
+        "max": 0.666,
+        "area_px": 221
+      }
+    },
+    {
+      "id": 10,
+      "bbox": [
+        1768,
+        1740,
+        16,
+        17
+      ],
+      "score": 0.203,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.915
+      },
+      "hotspot_stats": {
+        "p90": 0.646,
+        "max": 0.915,
+        "area_px": 272
+      }
+    },
+    {
+      "id": 11,
+      "bbox": [
+        2640,
+        1735,
+        1,
+        2
+      ],
+      "score": 0.396,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.018
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 2
+      }
+    },
+    {
+      "id": 12,
+      "bbox": [
+        1848,
+        1716,
+        45,
+        21
+      ],
+      "score": 0.209,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.947
+      },
+      "hotspot_stats": {
+        "p90": 0.687,
+        "max": 0.881,
+        "area_px": 945
+      }
+    },
+    {
+      "id": 13,
+      "bbox": [
+        1824,
+        1728,
+        9,
+        8
+      ],
+      "score": 0.206,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.939
+      },
+      "hotspot_stats": {
+        "p90": 0.939,
+        "max": 0.939,
+        "area_px": 72
+      }
+    },
+    {
+      "id": 14,
+      "bbox": [
+        848,
+        1702,
+        13,
+        9
+      ],
+      "score": 0.457,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.757,
+        "dwarm": 0.008,
+        "dssim": 0.941
+      },
+      "hotspot_stats": {
+        "p90": 0.941,
+        "max": 0.941,
+        "area_px": 117
+      }
+    },
+    {
+      "id": 15,
+      "bbox": [
+        1908,
+        1692,
+        21,
+        17
+      ],
+      "score": 0.207,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.933
+      },
+      "hotspot_stats": {
+        "p90": 0.805,
+        "max": 0.933,
+        "area_px": 357
+      }
+    },
+    {
+      "id": 16,
+      "bbox": [
+        2598,
+        1694,
+        43,
+        19
+      ],
+      "score": 0.446,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.129,
+        "dwarm": 0.869,
+        "dssim": 0.05
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 817
+      }
+    },
+    {
+      "id": 17,
+      "bbox": [
+        863,
+        1690,
+        12,
+        27
+      ],
+      "score": 0.439,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.741,
+        "dwarm": 0.008,
+        "dssim": 0.88
+      },
+      "hotspot_stats": {
+        "p90": 0.88,
+        "max": 0.88,
+        "area_px": 324
+      }
+    },
+    {
+      "id": 18,
+      "bbox": [
+        1824,
+        1688,
+        21,
+        17
+      ],
+      "score": 0.197,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.885
+      },
+      "hotspot_stats": {
+        "p90": 0.857,
+        "max": 0.954,
+        "area_px": 357
+      }
+    },
+    {
+      "id": 19,
+      "bbox": [
+        1820,
+        1676,
+        9,
+        9
+      ],
+      "score": 0.202,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.917
+      },
+      "hotspot_stats": {
+        "p90": 0.917,
+        "max": 0.923,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 20,
+      "bbox": [
+        1908,
+        1672,
+        9,
+        9
+      ],
+      "score": 0.205,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.929
+      },
+      "hotspot_stats": {
+        "p90": 0.929,
+        "max": 0.933,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 21,
+      "bbox": [
+        2631,
+        1664,
+        9,
+        16
+      ],
+      "score": 0.395,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.014
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.926,
+        "area_px": 144
+      }
+    },
+    {
+      "id": 22,
+      "bbox": [
+        2600,
+        1663,
+        28,
+        18
+      ],
+      "score": 0.471,
+      "severity": "high",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.116,
+        "dwarm": 0.926,
+        "dssim": 0.067
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.96,
+        "area_px": 504
+      }
+    },
+    {
+      "id": 23,
+      "bbox": [
+        1916,
+        1636,
+        13,
+        21
+      ],
+      "score": 0.156,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.681
+      },
+      "hotspot_stats": {
+        "p90": 0.681,
+        "max": 0.821,
+        "area_px": 273
+      }
+    },
+    {
+      "id": 24,
+      "bbox": [
+        2600,
+        1631,
+        41,
+        18
+      ],
+      "score": 0.435,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.11,
+        "dwarm": 0.869,
+        "dssim": 0.028
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 738
+      }
+    },
+    {
+      "id": 25,
+      "bbox": [
+        1924,
+        1620,
+        9,
+        9
+      ],
+      "score": 0.207,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.94
+      },
+      "hotspot_stats": {
+        "p90": 0.821,
+        "max": 0.94,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 26,
+      "bbox": [
+        1960,
+        1552,
+        17,
+        17
+      ],
+      "score": 0.2,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.899
+      },
+      "hotspot_stats": {
+        "p90": 0.721,
+        "max": 0.954,
+        "area_px": 289
+      }
+    },
+    {
+      "id": 27,
+      "bbox": [
+        2635,
+        1550,
+        3,
+        2
+      ],
+      "score": 0.395,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.012
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 6
+      }
+    },
+    {
+      "id": 28,
+      "bbox": [
+        1920,
+        1544,
+        13,
+        9
+      ],
+      "score": 0.177,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.794
+      },
+      "hotspot_stats": {
+        "p90": 0.794,
+        "max": 0.946,
+        "area_px": 117
+      }
+    },
+    {
+      "id": 29,
+      "bbox": [
+        2638,
+        1535,
+        2,
+        6
+      ],
+      "score": 0.395,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.012
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 12
+      }
+    },
+    {
+      "id": 30,
+      "bbox": [
+        987,
+        1531,
+        10,
+        10
+      ],
+      "score": 0.185,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.031,
+        "dwarm": 0.0,
+        "dssim": 0.871
+      },
+      "hotspot_stats": {
+        "p90": 0.871,
+        "max": 0.871,
+        "area_px": 100
+      }
+    },
+    {
+      "id": 31,
+      "bbox": [
+        1032,
+        1524,
+        9,
+        9
+      ],
+      "score": 0.158,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.031,
+        "dwarm": 0.0,
+        "dssim": 0.734
+      },
+      "hotspot_stats": {
+        "p90": 0.734,
+        "max": 0.734,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 32,
+      "bbox": [
+        1884,
+        1516,
+        9,
+        9
+      ],
+      "score": 0.2,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.906
+      },
+      "hotspot_stats": {
+        "p90": 0.906,
+        "max": 0.906,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 33,
+      "bbox": [
+        1796,
+        1467,
+        61,
+        42
+      ],
+      "score": 0.211,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.957
+      },
+      "hotspot_stats": {
+        "p90": 0.797,
+        "max": 0.952,
+        "area_px": 2562
+      }
+    },
+    {
+      "id": 34,
+      "bbox": [
+        1768,
+        1456,
+        21,
+        17
+      ],
+      "score": 0.211,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.955
+      },
+      "hotspot_stats": {
+        "p90": 0.9,
+        "max": 0.955,
+        "area_px": 357
+      }
+    },
+    {
+      "id": 35,
+      "bbox": [
+        1744,
+        1441,
+        17,
+        16
+      ],
+      "score": 0.187,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.837
+      },
+      "hotspot_stats": {
+        "p90": 0.837,
+        "max": 0.837,
+        "area_px": 272
+      }
+    },
+    {
+      "id": 36,
+      "bbox": [
+        2638,
+        1432,
+        2,
+        6
+      ],
+      "score": 0.394,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.01
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 12
+      }
+    },
+    {
+      "id": 37,
+      "bbox": [
+        2600,
+        1423,
+        38,
+        18
+      ],
+      "score": 0.441,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.113,
+        "dwarm": 0.869,
+        "dssim": 0.054
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.995,
+        "area_px": 684
+      }
+    },
+    {
+      "id": 38,
+      "bbox": [
+        1704,
+        1416,
+        21,
+        13
+      ],
+      "score": 0.147,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.659
+      },
+      "hotspot_stats": {
+        "p90": 0.659,
+        "max": 0.934,
+        "area_px": 273
+      }
+    },
+    {
+      "id": 39,
+      "bbox": [
+        1692,
+        1404,
+        9,
+        17
+      ],
+      "score": 0.197,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.051,
+        "dwarm": 0.004,
+        "dssim": 0.885
+      },
+      "hotspot_stats": {
+        "p90": 0.885,
+        "max": 0.885,
+        "area_px": 153
+      }
+    },
+    {
+      "id": 40,
+      "bbox": [
+        1676,
+        1404,
+        9,
+        9
+      ],
+      "score": 0.191,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.035,
+        "dwarm": 0.004,
+        "dssim": 0.885
+      },
+      "hotspot_stats": {
+        "p90": 0.885,
+        "max": 0.885,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 41,
+      "bbox": [
+        2600,
+        1391,
+        40,
+        18
+      ],
+      "score": 0.437,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.11,
+        "dwarm": 0.869,
+        "dssim": 0.04
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.945,
+        "area_px": 720
+      }
+    },
+    {
+      "id": 42,
+      "bbox": [
+        252,
+        1388,
+        9,
+        9
+      ],
+      "score": 0.166,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.035,
+        "dwarm": 0.004,
+        "dssim": 0.76
+      },
+      "hotspot_stats": {
+        "p90": 0.76,
+        "max": 0.76,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 43,
+      "bbox": [
+        2600,
+        1359,
+        41,
+        18
+      ],
+      "score": 0.428,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.094,
+        "dwarm": 0.869,
+        "dssim": 0.018
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 738
+      }
+    },
+    {
+      "id": 44,
+      "bbox": [
+        2637,
+        1335,
+        3,
+        9
+      ],
+      "score": 0.42,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.926,
+        "dssim": 0.011
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.926,
+        "area_px": 27
+      }
+    },
+    {
+      "id": 45,
+      "bbox": [
+        2600,
+        1333,
+        8,
+        1
+      ],
+      "score": 0.393,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.361,
+        "dwarm": 0.555,
+        "dssim": 0.082
+      },
+      "hotspot_stats": {
+        "p90": 0.555,
+        "max": 0.561,
+        "area_px": 8
+      }
+    },
+    {
+      "id": 46,
+      "bbox": [
+        2600,
+        1183,
+        41,
+        162
+      ],
+      "score": 0.405,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.02,
+        "dwarm": 0.869,
+        "dssim": 0.033
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.995,
+        "area_px": 6642
+      }
+    },
+    {
+      "id": 47,
+      "bbox": [
+        2600,
+        1193,
+        16,
+        8
+      ],
+      "score": 0.288,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.172,
+        "dwarm": 0.478,
+        "dssim": 0.063
+      },
+      "hotspot_stats": {
+        "p90": 0.478,
+        "max": 0.942,
+        "area_px": 128
+      }
+    },
+    {
+      "id": 48,
+      "bbox": [
+        2600,
+        1151,
+        40,
+        18
+      ],
+      "score": 0.429,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.094,
+        "dwarm": 0.869,
+        "dssim": 0.024
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.945,
+        "area_px": 720
+      }
+    },
+    {
+      "id": 49,
+      "bbox": [
+        2600,
+        1119,
+        41,
+        18
+      ],
+      "score": 0.416,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.063,
+        "dwarm": 0.869,
+        "dssim": 0.015
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 738
+      }
+    },
+    {
+      "id": 50,
+      "bbox": [
+        2600,
+        1087,
+        41,
+        18
+      ],
+      "score": 0.423,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.084,
+        "dwarm": 0.869,
+        "dssim": 0.012
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 738
+      }
+    },
+    {
+      "id": 51,
+      "bbox": [
+        2611,
+        1065,
+        1,
+        1
+      ],
+      "score": 0.422,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.926,
+        "dssim": 0.018
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.926,
+        "area_px": 1
+      }
+    },
+    {
+      "id": 52,
+      "bbox": [
+        2600,
+        1004,
+        40,
+        69
+      ],
+      "score": 0.427,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.02,
+        "dwarm": 0.925,
+        "dssim": 0.022
+      },
+      "hotspot_stats": {
+        "p90": 0.925,
+        "max": 0.945,
+        "area_px": 2760
+      }
+    },
+    {
+      "id": 53,
+      "bbox": [
+        2617,
+        1004,
+        1,
+        1
+      ],
+      "score": 0.42,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.0,
+        "dwarm": 0.926,
+        "dssim": 0.014
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.926,
+        "area_px": 1
+      }
+    },
+    {
+      "id": 54,
+      "bbox": [
+        2600,
+        911,
+        41,
+        93
+      ],
+      "score": 0.399,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.016,
+        "dwarm": 0.869,
+        "dssim": 0.014
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 3813
+      }
+    },
+    {
+      "id": 55,
+      "bbox": [
+        415,
+        927,
+        18,
+        33
+      ],
+      "score": 0.254,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.102,
+        "dwarm": 0.055,
+        "dssim": 0.966
+      },
+      "hotspot_stats": {
+        "p90": 0.966,
+        "max": 0.966,
+        "area_px": 594
+      }
+    },
+    {
+      "id": 56,
+      "bbox": [
+        2640,
+        926,
+        1,
+        2
+      ],
+      "score": 0.393,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.004
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 2
+      }
+    },
+    {
+      "id": 57,
+      "bbox": [
+        971,
+        926,
+        20,
+        20
+      ],
+      "score": 0.259,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.11,
+        "dwarm": 0.063,
+        "dssim": 0.964
+      },
+      "hotspot_stats": {
+        "p90": 0.964,
+        "max": 0.964,
+        "area_px": 400
+      }
+    },
+    {
+      "id": 58,
+      "bbox": [
+        2607,
+        918,
+        1,
+        2
+      ],
+      "score": 0.394,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.008
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 2
+      }
+    },
+    {
+      "id": 59,
+      "bbox": [
+        2600,
+        879,
+        41,
+        18
+      ],
+      "score": 0.418,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.071,
+        "dwarm": 0.869,
+        "dssim": 0.011
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.973,
+        "area_px": 738
+      }
+    },
+    {
+      "id": 60,
+      "bbox": [
+        2600,
+        847,
+        40,
+        18
+      ],
+      "score": 0.417,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.067,
+        "dwarm": 0.869,
+        "dssim": 0.014
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 720
+      }
+    },
+    {
+      "id": 61,
+      "bbox": [
+        2600,
+        815,
+        40,
+        18
+      ],
+      "score": 0.423,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.082,
+        "dwarm": 0.869,
+        "dssim": 0.015
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.978,
+        "area_px": 720
+      }
+    },
+    {
+      "id": 62,
+      "bbox": [
+        1720,
+        818,
+        35,
+        36
+      ],
+      "score": 0.294,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.145,
+        "dwarm": 0.11,
+        "dssim": 0.968
+      },
+      "hotspot_stats": {
+        "p90": 0.968,
+        "max": 0.968,
+        "area_px": 1260
+      }
+    },
+    {
+      "id": 63,
+      "bbox": [
+        596,
+        800,
+        21,
+        13
+      ],
+      "score": 0.171,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.775
+      },
+      "hotspot_stats": {
+        "p90": 0.775,
+        "max": 0.775,
+        "area_px": 273
+      }
+    },
+    {
+      "id": 64,
+      "bbox": [
+        2600,
+        773,
+        40,
+        28
+      ],
+      "score": 0.428,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.024,
+        "dwarm": 0.926,
+        "dssim": 0.017
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.995,
+        "area_px": 1120
+      }
+    },
+    {
+      "id": 65,
+      "bbox": [
+        564,
+        772,
+        17,
+        17
+      ],
+      "score": 0.193,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.888
+      },
+      "hotspot_stats": {
+        "p90": 0.875,
+        "max": 0.888,
+        "area_px": 289
+      }
+    },
+    {
+      "id": 66,
+      "bbox": [
+        528,
+        756,
+        29,
+        21
+      ],
+      "score": 0.157,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.705
+      },
+      "hotspot_stats": {
+        "p90": 0.705,
+        "max": 0.705,
+        "area_px": 609
+      }
+    },
+    {
+      "id": 67,
+      "bbox": [
+        493,
+        736,
+        8,
+        9
+      ],
+      "score": 0.163,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.035,
+        "dwarm": 0.004,
+        "dssim": 0.744
+      },
+      "hotspot_stats": {
+        "p90": 0.744,
+        "max": 0.744,
+        "area_px": 72
+      }
+    },
+    {
+      "id": 68,
+      "bbox": [
+        472,
+        724,
+        17,
+        13
+      ],
+      "score": 0.188,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.864
+      },
+      "hotspot_stats": {
+        "p90": 0.864,
+        "max": 0.934,
+        "area_px": 221
+      }
+    },
+    {
+      "id": 69,
+      "bbox": [
+        2600,
+        639,
+        41,
+        135
+      ],
+      "score": 0.401,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.02,
+        "dwarm": 0.869,
+        "dssim": 0.015
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.995,
+        "area_px": 5535
+      }
+    },
+    {
+      "id": 70,
+      "bbox": [
+        452,
+        708,
+        9,
+        9
+      ],
+      "score": 0.198,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.035,
+        "dwarm": 0.004,
+        "dssim": 0.919
+      },
+      "hotspot_stats": {
+        "p90": 0.919,
+        "max": 0.919,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 71,
+      "bbox": [
+        428,
+        696,
+        13,
+        9
+      ],
+      "score": 0.16,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.721
+      },
+      "hotspot_stats": {
+        "p90": 0.721,
+        "max": 0.721,
+        "area_px": 117
+      }
+    },
+    {
+      "id": 72,
+      "bbox": [
+        384,
+        664,
+        33,
+        29
+      ],
+      "score": 0.203,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.937
+      },
+      "hotspot_stats": {
+        "p90": 0.769,
+        "max": 0.937,
+        "area_px": 957
+      }
+    },
+    {
+      "id": 73,
+      "bbox": [
+        364,
+        648,
+        9,
+        9
+      ],
+      "score": 0.201,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.911
+      },
+      "hotspot_stats": {
+        "p90": 0.911,
+        "max": 0.911,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 74,
+      "bbox": [
+        2638,
+        640,
+        2,
+        8
+      ],
+      "score": 0.418,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.0,
+        "dwarm": 0.926,
+        "dssim": 0.006
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.926,
+        "area_px": 16
+      }
+    },
+    {
+      "id": 75,
+      "bbox": [
+        2600,
+        607,
+        40,
+        18
+      ],
+      "score": 0.431,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.082,
+        "dwarm": 0.885,
+        "dssim": 0.022
+      },
+      "hotspot_stats": {
+        "p90": 0.885,
+        "max": 0.973,
+        "area_px": 720
+      }
+    },
+    {
+      "id": 76,
+      "bbox": [
+        260,
+        584,
+        9,
+        9
+      ],
+      "score": 0.201,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.043,
+        "dwarm": 0.008,
+        "dssim": 0.914
+      },
+      "hotspot_stats": {
+        "p90": 0.914,
+        "max": 0.914,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 77,
+      "bbox": [
+        2600,
+        575,
+        40,
+        18
+      ],
+      "score": 0.427,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.09,
+        "dwarm": 0.87,
+        "dssim": 0.019
+      },
+      "hotspot_stats": {
+        "p90": 0.87,
+        "max": 0.996,
+        "area_px": 720
+      }
+    },
+    {
+      "id": 78,
+      "bbox": [
+        2600,
+        543,
+        40,
+        18
+      ],
+      "score": 0.45,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.079,
+        "dwarm": 0.926,
+        "dssim": 0.027
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.995,
+        "area_px": 720
+      }
+    },
+    {
+      "id": 79,
+      "bbox": [
+        1620,
+        508,
+        9,
+        9
+      ],
+      "score": 0.143,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.031,
+        "dwarm": 0.0,
+        "dssim": 0.66
+      },
+      "hotspot_stats": {
+        "p90": 0.66,
+        "max": 0.66,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 80,
+      "bbox": [
+        2600,
+        504,
+        40,
+        25
+      ],
+      "score": 0.421,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.067,
+        "dwarm": 0.869,
+        "dssim": 0.033
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.974,
+        "area_px": 1000
+      }
+    },
+    {
+      "id": 81,
+      "bbox": [
+        2575,
+        483,
+        1,
+        12
+      ],
+      "score": 0.273,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.196,
+        "dwarm": 0.4,
+        "dssim": 0.122
+      },
+      "hotspot_stats": {
+        "p90": 0.4,
+        "max": 0.404,
+        "area_px": 12
+      }
+    },
+    {
+      "id": 82,
+      "bbox": [
+        2600,
+        367,
+        41,
+        135
+      ],
+      "score": 0.434,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.031,
+        "dwarm": 0.926,
+        "dssim": 0.034
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.995,
+        "area_px": 5535
+      }
+    },
+    {
+      "id": 83,
+      "bbox": [
+        1532,
+        464,
+        25,
+        21
+      ],
+      "score": 0.184,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.038,
+        "dwarm": 0.0,
+        "dssim": 0.853
+      },
+      "hotspot_stats": {
+        "p90": 0.57,
+        "max": 0.886,
+        "area_px": 525
+      }
+    },
+    {
+      "id": 84,
+      "bbox": [
+        1548,
+        448,
+        49,
+        25
+      ],
+      "score": 0.177,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.805
+      },
+      "hotspot_stats": {
+        "p90": 0.805,
+        "max": 0.929,
+        "area_px": 1225
+      }
+    },
+    {
+      "id": 85,
+      "bbox": [
+        1248,
+        392,
+        13,
+        17
+      ],
+      "score": 0.169,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.767
+      },
+      "hotspot_stats": {
+        "p90": 0.767,
+        "max": 0.932,
+        "area_px": 221
+      }
+    },
+    {
+      "id": 86,
+      "bbox": [
+        2640,
+        375,
+        1,
+        2
+      ],
+      "score": 0.393,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.005
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 2
+      }
+    },
+    {
+      "id": 87,
+      "bbox": [
+        2624,
+        367,
+        3,
+        1
+      ],
+      "score": 0.415,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.915,
+        "dssim": 0.011
+      },
+      "hotspot_stats": {
+        "p90": 0.915,
+        "max": 0.926,
+        "area_px": 3
+      }
+    },
+    {
+      "id": 88,
+      "bbox": [
+        2600,
+        335,
+        41,
+        18
+      ],
+      "score": 0.455,
+      "severity": "high",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.094,
+        "dwarm": 0.905,
+        "dssim": 0.071
+      },
+      "hotspot_stats": {
+        "p90": 0.905,
+        "max": 0.942,
+        "area_px": 738
+      }
+    },
+    {
+      "id": 89,
+      "bbox": [
+        1603,
+        314,
+        50,
+        83
+      ],
+      "score": 0.283,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.125,
+        "dwarm": 0.09,
+        "dssim": 0.994
+      },
+      "hotspot_stats": {
+        "p90": 0.994,
+        "max": 0.994,
+        "area_px": 4150
+      }
+    },
+    {
+      "id": 90,
+      "bbox": [
+        2620,
+        303,
+        20,
+        18
+      ],
+      "score": 0.406,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.02,
+        "dwarm": 0.869,
+        "dssim": 0.041
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.996,
+        "area_px": 360
+      }
+    },
+    {
+      "id": 91,
+      "bbox": [
+        1380,
+        304,
+        13,
+        9
+      ],
+      "score": 0.185,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.847
+      },
+      "hotspot_stats": {
+        "p90": 0.847,
+        "max": 0.847,
+        "area_px": 117
+      }
+    },
+    {
+      "id": 92,
+      "bbox": [
+        1344,
+        304,
+        21,
+        9
+      ],
+      "score": 0.149,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.67
+      },
+      "hotspot_stats": {
+        "p90": 0.67,
+        "max": 0.67,
+        "area_px": 189
+      }
+    },
+    {
+      "id": 93,
+      "bbox": [
+        2600,
+        303,
+        21,
+        18
+      ],
+      "score": 0.449,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.11,
+        "dwarm": 0.869,
+        "dssim": 0.099
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.942,
+        "area_px": 378
+      }
+    },
+    {
+      "id": 94,
+      "bbox": [
+        1544,
+        276,
+        17,
+        17
+      ],
+      "score": 0.134,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.594
+      },
+      "hotspot_stats": {
+        "p90": 0.594,
+        "max": 0.594,
+        "area_px": 289
+      }
+    },
+    {
+      "id": 95,
+      "bbox": [
+        2600,
+        271,
+        41,
+        18
+      ],
+      "score": 0.461,
+      "severity": "high",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.087,
+        "dwarm": 0.925,
+        "dssim": 0.072
+      },
+      "hotspot_stats": {
+        "p90": 0.925,
+        "max": 0.973,
+        "area_px": 738
+      }
+    },
+    {
+      "id": 96,
+      "bbox": [
+        1647,
+        268,
+        20,
+        20
+      ],
+      "score": 0.26,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.106,
+        "dwarm": 0.071,
+        "dssim": 0.955
+      },
+      "hotspot_stats": {
+        "p90": 0.955,
+        "max": 0.955,
+        "area_px": 400
+      }
+    },
+    {
+      "id": 97,
+      "bbox": [
+        1564,
+        260,
+        41,
+        37
+      ],
+      "score": 0.196,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.901
+      },
+      "hotspot_stats": {
+        "p90": 0.739,
+        "max": 0.901,
+        "area_px": 1517
+      }
+    },
+    {
+      "id": 98,
+      "bbox": [
+        1268,
+        260,
+        25,
+        29
+      ],
+      "score": 0.181,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.827
+      },
+      "hotspot_stats": {
+        "p90": 0.808,
+        "max": 0.827,
+        "area_px": 725
+      }
+    },
+    {
+      "id": 99,
+      "bbox": [
+        1672,
+        252,
+        9,
+        9
+      ],
+      "score": 0.199,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.035,
+        "dwarm": 0.004,
+        "dssim": 0.926
+      },
+      "hotspot_stats": {
+        "p90": 0.795,
+        "max": 0.926,
+        "area_px": 81
+      }
+    },
+    {
+      "id": 100,
+      "bbox": [
+        1285,
+        232,
+        45,
+        25
+      ],
+      "score": 0.202,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.039,
+        "dwarm": 0.004,
+        "dssim": 0.934
+      },
+      "hotspot_stats": {
+        "p90": 0.672,
+        "max": 0.831,
+        "area_px": 1125
+      }
+    },
+    {
+      "id": 101,
+      "bbox": [
+        1732,
+        208,
+        25,
+        29
+      ],
+      "score": 0.2,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.901
+      },
+      "hotspot_stats": {
+        "p90": 0.798,
+        "max": 0.948,
+        "area_px": 725
+      }
+    },
+    {
+      "id": 102,
+      "bbox": [
+        2600,
+        95,
+        41,
+        162
+      ],
+      "score": 0.442,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.016,
+        "dwarm": 0.926,
+        "dssim": 0.101
+      },
+      "hotspot_stats": {
+        "p90": 0.926,
+        "max": 0.995,
+        "area_px": 6642
+      }
+    },
+    {
+      "id": 103,
+      "bbox": [
+        1740,
+        172,
+        13,
+        21
+      ],
+      "score": 0.209,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.047,
+        "dwarm": 0.008,
+        "dssim": 0.945
+      },
+      "hotspot_stats": {
+        "p90": 0.937,
+        "max": 0.948,
+        "area_px": 273
+      }
+    },
+    {
+      "id": 104,
+      "bbox": [
+        1662,
+        175,
+        71,
+        74
+      ],
+      "score": 0.236,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.073,
+        "dwarm": 0.035,
+        "dssim": 0.972
+      },
+      "hotspot_stats": {
+        "p90": 0.972,
+        "max": 0.976,
+        "area_px": 5254
+      }
+    },
+    {
+      "id": 105,
+      "bbox": [
+        972,
+        124,
+        87,
+        73
+      ],
+      "score": 0.357,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.239,
+        "dwarm": 0.165,
+        "dssim": 0.998
+      },
+      "hotspot_stats": {
+        "p90": 0.998,
+        "max": 0.998,
+        "area_px": 6351
+      }
+    },
+    {
+      "id": 106,
+      "bbox": [
+        1706,
+        100,
+        20,
+        33
+      ],
+      "score": 0.253,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.098,
+        "dwarm": 0.051,
+        "dssim": 0.978
+      },
+      "hotspot_stats": {
+        "p90": 0.978,
+        "max": 0.978,
+        "area_px": 660
+      }
+    },
+    {
+      "id": 107,
+      "bbox": [
+        2638,
+        72,
+        2,
+        6
+      ],
+      "score": 0.396,
+      "severity": "medium",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.004,
+        "dwarm": 0.869,
+        "dssim": 0.017
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.869,
+        "area_px": 12
+      }
+    },
+    {
+      "id": 108,
+      "bbox": [
+        2600,
+        63,
+        38,
+        18
+      ],
+      "score": 0.465,
+      "severity": "high",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.114,
+        "dwarm": 0.869,
+        "dssim": 0.173
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.945,
+        "area_px": 684
+      }
+    },
+    {
+      "id": 109,
+      "bbox": [
+        1730,
+        37,
+        25,
+        35
+      ],
+      "score": 0.254,
+      "severity": "low",
+      "uncertain": true,
+      "cues": {
+        "dgray": 0.102,
+        "dwarm": 0.055,
+        "dssim": 0.968
+      },
+      "hotspot_stats": {
+        "p90": 0.968,
+        "max": 0.968,
+        "area_px": 875
+      }
+    },
+    {
+      "id": 110,
+      "bbox": [
+        2600,
+        31,
+        40,
+        18
+      ],
+      "score": 0.44,
+      "severity": "medium",
+      "uncertain": false,
+      "cues": {
+        "dgray": 0.102,
+        "dwarm": 0.869,
+        "dssim": 0.067
+      },
+      "hotspot_stats": {
+        "p90": 0.869,
+        "max": 0.995,
+        "area_px": 720
+      }
+    }
+  ],
+  "params_used": {
+    "low_thresh": 0.22,
+    "high_thresh": 0.4,
+    "min_area": 30,
+    "merge_radius": 8
+  }
+}

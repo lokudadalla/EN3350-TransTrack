@@ -1,0 +1,72 @@
+{
+  "transformerId": "Tx04",
+  "baselineImageId": "T5_normal_001",
+  "maintenanceImageId": "T4_faulty_002",
+  "engineVersion": "cv-2.1.0",
+  "registration": {
+    "used": false,
+    "inlierRatio": null
+  },
+  "normalization": {
+    "blackPointPctl": 2.0,
+    "whitePointPctl": 98.0
+  },
+  "global": {
+    "maxIntensity": 1.0,
+    "hotPixelsRatio": 0.3806851525821596
+  },
+  "verdict": "potential",
+  "detections": [
+    {
+      "id": "det_001",
+      "component": "wire_segment",
+      "bbox": [
+        90,
+        244,
+        6,
+        3
+      ],
+      "type": "full_wire_overload",
+      "severity": "potential",
+      "confidence": 0.65,
+      "metrics": {
+        "peak": 0.996,
+        "bg": 0.8641,
+        "delta": 0.132,
+        "deltaVsBaseline": 0.996,
+        "areaPx": 8,
+        "hotRatio": 0.7778,
+        "elongation": 0.5,
+        "aspect": 2.0
+      },
+      "polygon": [
+        [
+          91,
+          244
+        ],
+        [
+          90,
+          245
+        ],
+        [
+          91,
+          246
+        ],
+        [
+          94,
+          246
+        ],
+        [
+          95,
+          245
+        ],
+        [
+          94,
+          244
+        ]
+      ]
+    }
+  ],
+  "timestamp": "2025-09-28T18:41:46.887781+05:30",
+  "notes": "HSV masks + hist-match diff + local/background \u0394"
+}
