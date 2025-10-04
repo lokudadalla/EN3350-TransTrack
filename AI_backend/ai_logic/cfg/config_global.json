@@ -1,0 +1,27 @@
+{
+  "yolo_min_conf": 0.2,
+  "shape": {
+    "min_area_frac": 0.001,
+    "loose_area_frac": 0.1,
+    "wire_aspect_min": 2.2,
+    "wire_area_max": 0.25
+  },
+  "color": {
+    "sat_min": 0.35,
+    "val_min": 0.5,
+    "dv_min": 0.12,
+    "dl_min": 0.08
+  },
+  "color_hot": {
+    "sat_min_hot": 0.45,
+    "val_min_hot": 0.65,
+    "dv_min_hot": 0.18
+  },
+  "decision": {
+  "rule_prob_thr": 0.4,
+  "use_rule_only_fallback": true
+  }
+}
+
+
+
