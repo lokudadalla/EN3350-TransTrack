@@ -4,12 +4,19 @@ import com.entc.dao.InspectionDetails;
 import com.entc.dao.TransformerDetails;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface InspectionRepository extends JpaRepository<InspectionDetails, Long> {
 
-    //find inspection details by using transformer Id
-    List<InspectionDetails> findAllByTransformerNo(String transformerNo);
+    // list for one transformer for THIS user
+    List<InspectionDetails> findAllByTransformerNoAndUserId(String transformerNo, Long userId);
 
+    // list all for THIS user
+    List<InspectionDetails> findAllByUserId(Long userId);
+
+    // single row by id for THIS user
+    Optional<InspectionDetails> findByInspectionNoAndUserId(Long inspectionNo, Long userId);
 }
+

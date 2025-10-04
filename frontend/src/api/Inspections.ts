@@ -1,3 +1,5 @@
+import { getUser } from "../auth";
+
 export type InspectionDTO = {
     inspectionNo: number;          // backend id
     transformerNo: string;
@@ -11,8 +13,13 @@ export type InspectionDTO = {
   const BASE = import.meta.env.VITE_API_BASE ?? ""; 
   
   async function http<T>(path: string, init?: RequestInit): Promise<T> {
+    const u = getUser();
     const res = await fetch(`${BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
+      headers: {
+      "Content-Type": "application/json",
+      "X-User-Id": u?.id ? String(u.id) : "",   // <— key line
+      ...(init?.headers || {}),
+    },
       ...init,
     });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);

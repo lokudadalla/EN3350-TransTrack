@@ -6,10 +6,10 @@ import com.entc.dao.TransformerDetails;
 import java.util.List;
 
 public interface InspectionService {
-    List<InspectionDetails> getAllInspections();
-    InspectionDetails getById(Long id);
-    List<InspectionDetails> getAllInspectionByTransformerNo(String transformerNo);
-    InspectionDetails create(InspectionDetails toCreate);
-    InspectionDetails update(Long id, InspectionDetails toUpdate);
-    void delete(Long id);
+    List<InspectionDetails> getAllInspections(Long userId);
+    InspectionDetails getById(Long userId, Long id);
+    InspectionDetails create(Long userId, InspectionDetails toCreate);
+    List<InspectionDetails> getAllInspectionByTransformerNo(Long userId, String transformerNo);
+    InspectionDetails update(Long userId, Long id, InspectionDetails body);
+    void delete(Long userId, Long id);
 }

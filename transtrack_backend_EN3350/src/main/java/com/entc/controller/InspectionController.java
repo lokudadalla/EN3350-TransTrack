@@ -4,77 +4,86 @@ import com.entc.dao.InspectionDetails;
 import com.entc.dao.TransformerDetails;
 import com.entc.service.InspectionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+
+
+
 @RestController
 @RequestMapping("inspections")
 public class InspectionController {
 
-    @Autowired
-    InspectionService inspectionService;
+    private final InspectionService inspectionService;
+
+    public InspectionController(InspectionService inspectionService) {
+        this.inspectionService = inspectionService;
+    }
+
+    private Long requireUserId(String header) {
+    	  if (header == null || header.isBlank())
+    	    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing X-User-Id");
+    	  try { return Long.valueOf(header); }
+    	  catch (NumberFormatException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bad X-User-Id"); }
+    	}
+
 
     @GetMapping
-    List<InspectionDetails> getAllInspections() {
-        return inspectionService.getAllInspections();
+    List<InspectionDetails> getAllInspections(@RequestHeader("X-User-Id") String xUserId) {
+        return inspectionService.getAllInspections(requireUserId(xUserId));
     }
 
     @PostMapping
-    public ResponseEntity<InspectionDetails> create(@RequestBody InspectionDetails body) {
-        InspectionDetails created = inspectionService.create(body);
+    public ResponseEntity<InspectionDetails> create(
+        @RequestHeader("X-User-Id") String xUserId,
+        @RequestBody InspectionDetails body
+    ) {
+        var created = inspectionService.create(requireUserId(xUserId), body);
         URI location = URI.create("/inspections/" + created.getInspectionNo());
         return ResponseEntity.created(location).body(created);
     }
 
-    // Get by transformer No.
     @GetMapping("/by-no")
-    public List<InspectionDetails> getByTransformerNo(@RequestParam("no") String transformerNo) {
-        return inspectionService.getAllInspectionByTransformerNo(transformerNo);
+    public List<InspectionDetails> getByTransformerNo(
+        @RequestHeader("X-User-Id") String xUserId,
+        @RequestParam("no") String transformerNo
+    ) {
+        return inspectionService.getAllInspectionByTransformerNo(requireUserId(xUserId), transformerNo);
     }
 
     @GetMapping("/{id}")
-    public InspectionDetails getOne(@PathVariable Long id) {
-        return inspectionService.getById(id);
+    public InspectionDetails getOne(
+        @RequestHeader("X-User-Id") String xUserId,
+        @PathVariable Long id
+    ) {
+        return inspectionService.getById(requireUserId(xUserId), id);
     }
 
-    // Edit existing inspection data
     @PutMapping("/{id}")
-    public ResponseEntity<?> editById(@PathVariable Long id, @RequestBody InspectionDetails body) {
-        if (body == null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Request body is required"
-            ));
+    public ResponseEntity<?> editById(
+        @RequestHeader("X-User-Id") String xUserId,
+        @PathVariable Long id,
+        @RequestBody InspectionDetails body
+    ) {
+        if (body == null || body.getInspectionNo() == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "inspectionNo is required"));
         }
-        if (body.getInspectionNo() == null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "inspectionNo is required"
-            ));
-        }
-
-        try {
-            InspectionDetails updated = inspectionService.update(id, body);
-
-            if (updated == null) {
-                return ResponseEntity.notFound().build(); // transformer with given ID not found
-            }
-
-            return ResponseEntity.ok(updated);
-
-        } catch (Exception ex) {
-            return ResponseEntity.status(500).body(Map.of(
-                    "message", "Failed to update inspection",
-                    "detail", ex.getMessage()
-            ));
-        }
+        var updated = inspectionService.update(requireUserId(xUserId), id, body);
+        return updated == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(updated);
     }
-    // Delete
+
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        inspectionService.delete(id);
+    public ResponseEntity<Void> delete(
+        @RequestHeader("X-User-Id") String xUserId,
+        @PathVariable Long id
+    ) {
+        inspectionService.delete(requireUserId(xUserId), id);
         return ResponseEntity.noContent().build();
     }
 }

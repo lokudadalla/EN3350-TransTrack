@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+
 @Service
 @RequiredArgsConstructor
 public class InspectionImageService {
@@ -25,18 +26,23 @@ public class InspectionImageService {
     private final InspectionRepository inspectionRepo;
     private final InspectionImageRepository imageRepo;
     private final StorageService storage;
+    
+    public InspectionImageService(InspectionRepository inspectionRepo,InspectionImageRepository imageRepo,StorageService storage) {
+    	this.inspectionRepo = inspectionRepo;
+    	this.imageRepo = imageRepo;
+		this.storage = storage;
+    }
 
     @Transactional
-    public List<InspectionImage> upload(Long inspectionId,
-                                        ImageType type,
-                                        String uploader,
-                                        @org.springframework.lang.Nullable EnvironmentCondition condition,
+    public List<InspectionImage> upload(Long userId, Long inspectionId, ImageType type,
+                                        String uploader, @Nullable EnvironmentCondition condition,
                                         List<MultipartFile> files) throws IOException {
-        var inspection = inspectionRepo.findById(inspectionId)
-                .orElseThrow(() -> new IOException("Inspection not found: " + inspectionId));
+
+        var inspection = inspectionRepo.findByInspectionNoAndUserId(inspectionId, userId)
+                .orElseThrow(() -> new IOException("Inspection not found"));
 
         if (type == ImageType.BASELINE && condition == null) {
-            throw new IOException("condition is required for BASELINE images (SUNNY/CLOUDY/RAINY).");
+            throw new IOException("condition is required for BASELINE images.");
         }
 
         String uploaderSafe = (uploader == null || uploader.isBlank()) ? "unknown" : uploader.trim();
@@ -65,22 +71,22 @@ public class InspectionImageService {
     }
 
     @Transactional(readOnly = true)
-    public List<InspectionImage> list(Long inspectionId, @Nullable ImageType type) {
-        return type == null
-                ? imageRepo.findByInspection_InspectionNo(inspectionId)
-                : imageRepo.findByInspection_InspectionNoAndType(inspectionId, type);
+    public List<InspectionImage> list(Long userId, Long inspectionId, @Nullable ImageType type) {
+        return (type == null)
+            ? imageRepo.findByInspection_InspectionNoAndInspection_UserId(inspectionId, userId)
+            : imageRepo.findByInspection_InspectionNoAndInspection_UserIdAndType(inspectionId, userId, type);
     }
 
     @Transactional(readOnly = true)
-    public InspectionImage get(Long inspectionId, Long imageId) throws IOException {
-        return imageRepo.findById(imageId)
+    public InspectionImage get(Long userId, Long inspectionId, Long imageId) throws IOException {
+        return imageRepo.findByIdAndInspection_UserId(imageId, userId)
                 .filter(i -> i.getInspection().getInspectionNo().equals(inspectionId))
-                .orElseThrow(() -> new IOException("Image not found: " + imageId));
+                .orElseThrow(() -> new IOException("Image not found"));
     }
 
     @Transactional
-    public void delete(Long inspectionId, Long imageId) throws IOException {
-        InspectionImage img = get(inspectionId, imageId);
+    public void delete(Long userId, Long inspectionId, Long imageId) throws IOException {
+        var img = get(userId, inspectionId, imageId);
         storage.delete(img.getStoragePath());
         imageRepo.delete(img);
     }

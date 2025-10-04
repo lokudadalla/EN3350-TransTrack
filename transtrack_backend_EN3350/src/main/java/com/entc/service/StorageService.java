@@ -16,6 +16,43 @@ public interface StorageService {
     @Data
     @AllArgsConstructor
     class StoredFile {
-        private String storagePath, fileName, contentType; private long size;
+        private String storagePath, fileName, contentType; 
+        private long size;
+        
+        
+        public StoredFile() {}
+
+        public StoredFile(String storagePath, String fileName, String contentType, long size) {
+            this.storagePath = storagePath;
+            this.fileName = fileName;
+            this.contentType = contentType;
+            this.size = size;
+        }
+        
+        
+		public String getStoragePath() {
+			return storagePath;
+		}
+		public void setStoragePath(String storagePath) {
+			this.storagePath = storagePath;
+		}
+		public String getFileName() {
+			return fileName;
+		}
+		public void setFileName(String fileName) {
+			this.fileName = fileName;
+		}
+		public String getContentType() {
+			return contentType;
+		}
+		public void setContentType(String contentType) {
+			this.contentType = contentType;
+		}
+		public long getSize() {
+			return size;
+		}
+		public void setSize(long size) {
+			this.size = size;
+		}
     }
 }
