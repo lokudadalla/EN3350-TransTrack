@@ -13,8 +13,20 @@ def infer_thermal(
     imgsz: int = 640,
     web_payload: bool = False,
     half: bool = True,
+    cfg_overrides: dict | None = None,
 ):
     CFG = json.load(open(cfg_path, "r"))
+
+    if cfg_overrides:
+        def deep_merge(dst, src):
+            for k, v in src.items():
+                if isinstance(v, dict) and isinstance(dst.get(k), dict):
+                    deep_merge(dst[k], v)
+                else:
+                    dst[k] = v
+            return dst
+        deep_merge(CFG, cfg_overrides)
+
 
     def cfgv(path, default):
         d = CFG
