@@ -4,14 +4,14 @@ from pydantic import BaseModel
 from typing import Optional
 from pathlib import Path
 
-from ai_logic.infer_thermal import infer_thermal
+from AI_backend.ai_logic.infer_thermal import infer_thermal
 from typing import Dict, Any, Optional
 
 app = FastAPI(title="Transformer AI Backend")
 
-BASE_DIR = Path(__file__).resolve().parent
-WEIGHTS_PATH = BASE_DIR / "best.pt"
-CFG_PATH     = BASE_DIR / "cfg" / "config_global.json"
+BASE_DIR    = Path(__file__).resolve().parent
+WEIGHTS_PATH = BASE_DIR / "ai_logic" / "best.pt"
+CFG_PATH     = BASE_DIR / "ai_logic" / "cfg" / "config_global.json"
 
 class InferenceRequest(BaseModel):
     maintenance_image_path: str
