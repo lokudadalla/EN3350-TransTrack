@@ -5,8 +5,7 @@ Designed to be called from a **Java (Spring Boot) backend**, which is triggered 
 
 ---
 
-## Architecture
-
+##  Architecture
 
 ```mermaid
 graph TD
@@ -15,6 +14,7 @@ graph TD
     C --> D[FastAPI Server]
     D --> E[YOLO + Rule Logic]
     E --> F[Anomaly Results]
+
 
 
 
