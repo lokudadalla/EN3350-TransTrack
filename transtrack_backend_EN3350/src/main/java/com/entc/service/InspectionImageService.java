@@ -1,7 +1,6 @@
 package com.entc.service;
 
 import com.entc.dao.EnvironmentCondition;
-import com.entc.dao.InspectionDetails;
 import com.entc.dao.ImageType;
 import com.entc.dao.InspectionImage;
 import com.entc.repository.InspectionImageRepository;
@@ -18,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-
 @Service
 @RequiredArgsConstructor
 public class InspectionImageService {
@@ -26,12 +24,6 @@ public class InspectionImageService {
     private final InspectionRepository inspectionRepo;
     private final InspectionImageRepository imageRepo;
     private final StorageService storage;
-    
-    public InspectionImageService(InspectionRepository inspectionRepo,InspectionImageRepository imageRepo,StorageService storage) {
-    	this.inspectionRepo = inspectionRepo;
-    	this.imageRepo = imageRepo;
-		this.storage = storage;
-    }
 
     @Transactional
     public List<InspectionImage> upload(Long userId, Long inspectionId, ImageType type,
@@ -64,7 +56,8 @@ public class InspectionImageService {
             img.setSize(stored.getSize());
             img.setUploadedAt(LocalDateTime.now());
             img.setUploader(uploaderSafe);
-            img.setCondition(type == ImageType.BASELINE ? condition : null);  // <-- save it
+            img.setCondition(type == ImageType.BASELINE ? condition : null);
+
             saved.add(imageRepo.save(img));
         }
         return saved;
@@ -72,9 +65,10 @@ public class InspectionImageService {
 
     @Transactional(readOnly = true)
     public List<InspectionImage> list(Long userId, Long inspectionId, @Nullable ImageType type) {
+        // Use the user-scoped fetch-join queries to avoid N+1 and return newest first
         return (type == null)
-            ? imageRepo.findByInspection_InspectionNoAndInspection_UserId(inspectionId, userId)
-            : imageRepo.findByInspection_InspectionNoAndInspection_UserIdAndType(inspectionId, userId, type);
+                ? imageRepo.findAllWithAnomaliesForUser(inspectionId, userId)
+                : imageRepo.findAllWithAnomaliesByTypeForUser(inspectionId, userId, type);
     }
 
     @Transactional(readOnly = true)
@@ -90,5 +84,12 @@ public class InspectionImageService {
         storage.delete(img.getStoragePath());
         imageRepo.delete(img);
     }
-}
 
+    // If other parts still rely on non-user aware list, keep this:
+    @Transactional(readOnly = true)
+    public List<InspectionImage> list(Long inspectionId, @Nullable ImageType type) {
+        return (type == null)
+                ? imageRepo.findAllWithAnomalies(inspectionId)
+                : imageRepo.findAllWithAnomaliesByType(inspectionId, type);
+    }
+}

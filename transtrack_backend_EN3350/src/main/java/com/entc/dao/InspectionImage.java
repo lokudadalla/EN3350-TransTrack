@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "inspection_images")
@@ -47,6 +49,12 @@ public class InspectionImage {
     @Column(nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
+    // NEW: link to anomalies (one image → many anomalies)
+    @OneToMany(mappedBy = "inspectionImage",
+               fetch = FetchType.LAZY,
+               cascade = CascadeType.ALL,
+               orphanRemoval = true)
+    private List<InspectionImageAnomaly> anomalies = new ArrayList<>();
 	public Long getId() {
 		return id;
 	}

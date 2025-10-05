@@ -29,10 +29,6 @@ public class InspectionImageController {
 
     private final InspectionImageService imageService;
     
-    public InspectionImageController(InspectionImageService imageService) {
-        this.imageService = imageService;
-    }
-
     private Long requireUserId(String header) {
     	  if (header == null || header.isBlank())
     	    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing X-User-Id");
