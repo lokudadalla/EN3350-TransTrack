@@ -284,18 +284,14 @@ def infer_thermal(
             "y": int(b["y"]),
             "width": int(b["w"]),
             "height": int(b["h"]),
-            "label": b["finalClass"],
-            "score": round(float(b["detConfidence"]), 4),
-            "size": float(b["w"] * b["h"]),     # pixel area
+            "label": str(b["finalClass"]),
+            "score": float(b["detConfidence"]),
+            "size": float(b["w"] * b["h"]),   # pixel area
         }
         for b in refined
     ]
 
-    if web_payload:
-        # Return ONLY the minimal schema for the frontend
-        result = {"boxes": web_boxes}
-    else:
-        result = full_result
+    result = {"boxes": web_boxes} if web_payload else full_result
 
     if save_annot:
         out = cv2.cvtColor(cand_raw, cv2.COLOR_RGB2BGR).copy()

@@ -6,6 +6,10 @@ from pathlib import Path
 
 from AI_backend.ai_logic.infer_thermal import infer_thermal
 from typing import Dict, Any, Optional
+import os, tempfile, requests
+from urllib.parse import urlparse
+
+APP_PUBLIC_BASE = os.getenv("APP_PUBLIC_BASE", "http://localhost:8080")
 
 app = FastAPI(title="Transformer AI Backend")
 
@@ -25,6 +29,48 @@ class InferenceRequest(BaseModel):
     temperature_percent: Optional[int] = None   # e.g., 10, 20, 30, 40
 
     cfg_overrides: Optional[Dict[str, Any]] = None
+
+def _is_url(s: str) -> bool:
+    try:
+        u = urlparse(s)
+        return u.scheme in ("http", "https")
+    except:
+        return False
+
+def _fetch_to_local(path_or_id: str) -> str:
+    """
+    Accepts:
+      - local path: returns it unchanged if exists
+      - full URL: downloads it
+      - bare ID (e.g., DB id): builds URL using APP_PUBLIC_BASE and downloads
+    Returns a local temp file path suitable for OpenCV.
+    """
+    # Local file?
+    if Path(path_or_id).exists():
+        return path_or_id
+
+    # Full URL?
+    if _is_url(path_or_id):
+        url = path_or_id
+    else:
+        # Treat as an ID and construct the public URL your Java app exposes.
+        # Adjust endpoint to match your Spring controller:
+        # e.g., /api/files/{id} or /files/{id}
+        url = f"{APP_PUBLIC_BASE}/files/{path_or_id}"
+
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+
+    # Guess an extension if you can; fallback to .jpg
+    suffix = ".jpg"
+    ct = resp.headers.get("Content-Type", "")
+    if "png" in ct: suffix = ".png"
+    elif "jpeg" in ct or "jpg" in ct: suffix = ".jpg"
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    tmp.write(resp.content)
+    tmp.close()
+    return tmp.name    
 
 def build_overrides_linear(pct: Optional[int]) -> Dict[str, Any]:
     if pct is None:
@@ -58,15 +104,17 @@ def build_overrides_linear(pct: Optional[int]) -> Dict[str, Any]:
 @app.post("/infer")
 async def infer(req: InferenceRequest):
     try:
-        # sanity checks
-        if not Path(req.maintenance_image_path).exists():
-            raise HTTPException(status_code=400, detail="maintenance_image_path not found")
-        if req.baseline_image_path and not Path(req.baseline_image_path).exists():
-            raise HTTPException(status_code=400, detail="baseline_image_path not found")
+        # Only check model/config files on disk
         if not WEIGHTS_PATH.exists():
             raise HTTPException(status_code=500, detail="YOLO weights not found on server")
         if not CFG_PATH.exists():
             raise HTTPException(status_code=500, detail="Config file not found on server")
+
+        # Turn whatever we got (local path, URL, or DB id) into local temp files
+        maintenance_local = _fetch_to_local(req.maintenance_image_path)
+        baseline_local = None
+        if req.baseline_image_path:
+            baseline_local = _fetch_to_local(req.baseline_image_path)
 
         # Build linear overrides from the single UI % control
         percent_overrides = build_overrides_linear(req.temperature_percent)
@@ -83,17 +131,16 @@ async def infer(req: InferenceRequest):
                 return dst
             deep_merge(final_overrides, req.cfg_overrides)
 
-
         result = infer_thermal(
-            candidate_img=req.maintenance_image_path,
-            baseline_img=req.baseline_image_path,
+            candidate_img=maintenance_local,
+            baseline_img=baseline_local,
             weights=str(WEIGHTS_PATH),
             cfg_path=str(CFG_PATH),
             save_annot=req.save_annot,
             device=req.device,
             imgsz=req.imgsz,
             half=req.half,
-            web_payload=True,
+            web_payload=True,          # returns {"boxes":[...]} only
             cfg_overrides=final_overrides,
         )
         return result
