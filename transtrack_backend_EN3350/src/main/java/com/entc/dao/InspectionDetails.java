@@ -24,7 +24,7 @@ public class InspectionDetails {
 
     @Column(name = "transformer_no")
     private String transformerNo;
-    
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
@@ -46,8 +46,6 @@ public class InspectionDetails {
     @Column(name = "maintenance_date")
     private String maintenanceDate = "-";
 
-    //TODO: Add inspected by:
-
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -61,78 +59,7 @@ public class InspectionDetails {
         }
     }
 
-	public Long getInspectionNo() {
-		return inspectionNo;
-	}
-
-	public Long getUserId() {
-		return userId;
-	}
-
-	public void setUserId(Long userId) {
-		this.userId = userId;
-	}
-
-	public void setInspectionNo(Long inspectionNo) {
-		this.inspectionNo = inspectionNo;
-	}
-
-	public String getTransformerNo() {
-		return transformerNo;
-	}
-
-	public void setTransformerNo(String transformerNo) {
-		this.transformerNo = transformerNo;
-	}
-
-	public String getBranch() {
-		return branch;
-	}
-
-	public void setBranch(String branch) {
-		this.branch = branch;
-	}
-
-	public String getStatus() {
-		return status;
-	}
-
-	public void setStatus(String status) {
-		this.status = status;
-	}
-
-	public LocalDate getInspectionDate() {
-		return inspectionDate;
-	}
-
-	public void setInspectionDate(LocalDate inspectionDate) {
-		this.inspectionDate = inspectionDate;
-	}
-
-	public LocalTime getInspectionTime() {
-		return inspectionTime;
-	}
-
-	public void setInspectionTime(LocalTime inspectionTime) {
-		this.inspectionTime = inspectionTime;
-	}
-
-	public LocalDateTime getCreatedAt() {
-		return createdAt;
-	}
-
-	public void setCreatedAt(LocalDateTime createdAt) {
-		this.createdAt = createdAt;
-	}
-
-	public String getMaintenanceDate() {
-		return maintenanceDate;
-	}
-
-	public void setMaintenanceDate(String maintenanceDate) {
-		this.maintenanceDate = maintenanceDate;
-	}
-
-	
-	
+    // Explicit accessors for threshold (to satisfy service code)
+    public Double getInferenceThreshold() { return inferenceThreshold; }
+    public void setInferenceThreshold(Double inferenceThreshold) { this.inferenceThreshold = inferenceThreshold; }
 }

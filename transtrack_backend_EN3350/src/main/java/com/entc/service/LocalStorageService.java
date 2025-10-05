@@ -9,15 +9,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-// src/main/java/com/entc/service/storage/LocalStorageService.java
 @Service
 public class LocalStorageService implements StorageService {
 
@@ -33,15 +29,21 @@ public class LocalStorageService implements StorageService {
         String safeOriginal = original.replaceAll("[^a-zA-Z0-9._-]", "_");
         String saveName = UUID.randomUUID() + "-" + safeOriginal;
 
-        Path dir = root.resolve(Paths.get("inspections", inspectionId.toString(), type.name()));
+        Path dir = root.resolve(Paths.get("inspections", inspectionId.toString(), type.name().toLowerCase()));
         Files.createDirectories(dir);
 
         Path target = dir.resolve(saveName);
         try (InputStream in = file.getInputStream()) {
             Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
         }
-        String ctype = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
-        return new StoredFile(target.toString(), original, ctype, file.getSize());
+        String contentType = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
+
+        return new StoredFile(
+                target.toString(),   // storagePath (absolute path)
+                original,            // fileName (original name for display)
+                contentType,
+                file.getSize()
+        );
     }
 
     @Override
@@ -51,7 +53,7 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public void delete(String storagePath) throws IOException {
+        if (storagePath == null || storagePath.isBlank()) return;
         Files.deleteIfExists(Paths.get(storagePath));
     }
 }
-

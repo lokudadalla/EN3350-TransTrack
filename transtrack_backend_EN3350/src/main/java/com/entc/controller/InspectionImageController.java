@@ -1,11 +1,10 @@
 package com.entc.controller;
 
 import com.entc.dao.EnvironmentCondition;
-import com.entc.dto.InspectionImageDto;
 import com.entc.dao.ImageType;
+import com.entc.dto.InspectionImageDto;
+import com.entc.service.InferenceService;
 import com.entc.service.InspectionImageService;
-import com.entc.service.TransformerService;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -20,23 +19,26 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.util.List;
 
-// src/main/java/com/entc/controller/InspectionImageController.java
-
 @RestController
 @RequestMapping("/inspections/{inspectionId}/images")
 @RequiredArgsConstructor
 public class InspectionImageController {
 
     private final InspectionImageService imageService;
-    
+    private final InferenceService inferenceService; // ⬅️ added for URL-mode inference
+
     private Long requireUserId(String header) {
-    	  if (header == null || header.isBlank())
-    	    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing X-User-Id");
-    	  try { return Long.valueOf(header); }
-    	  catch (NumberFormatException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bad X-User-Id"); }
-    	}
+        if (header == null || header.isBlank())
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing X-User-Id");
+        try {
+            return Long.valueOf(header);
+        } catch (NumberFormatException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bad X-User-Id");
+        }
+    }
 
-
+    // POST /inspections/{inspectionId}/images?type=BASELINE|MAINTENANCE
+    // files are sent as multipart part name "files"
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public List<InspectionImageDto> upload(
             @RequestHeader("X-User-Id") String xUserId,
@@ -46,20 +48,37 @@ public class InspectionImageController {
             @RequestParam(required = false) EnvironmentCondition condition,
             @RequestPart("files") List<MultipartFile> files
     ) throws IOException {
-        return imageService.upload(requireUserId(xUserId), inspectionId, type, uploader, condition, files)
-                .stream().map(InspectionImageDto::from).toList();
+
+        Long userId = requireUserId(xUserId);
+
+        var saved = imageService.upload(userId, inspectionId, type, uploader, condition, files);
+
+        // For MAINTENANCE: immediately run inference (URL mode) and return the image with anomalies
+        if (type == ImageType.MAINTENANCE) {
+            if (saved.size() != 1) {
+                throw new IOException("Exactly one MAINTENANCE image must be uploaded at a time");
+            }
+            var withAnoms = inferenceService.runForMaintenance(userId, inspectionId, saved.get(0).getId());
+            return List.of(InspectionImageDto.from(withAnoms));
+        }
+
+        // For BASELINE (and others): just return what was saved
+        return saved.stream().map(InspectionImageDto::from).toList();
     }
 
+    // GET /inspections/{inspectionId}/images[?type=...]
     @GetMapping
     public List<InspectionImageDto> list(
             @RequestHeader("X-User-Id") String xUserId,
             @PathVariable Long inspectionId,
             @RequestParam(required = false) ImageType type
     ) {
-        return imageService.list(requireUserId(xUserId), inspectionId, type)
+        Long userId = requireUserId(xUserId);
+        return imageService.list(userId, inspectionId, type)
                 .stream().map(InspectionImageDto::from).toList();
     }
 
+    // GET /inspections/{inspectionId}/images/{imageId}/file
     @GetMapping("/{imageId}/file")
     public ResponseEntity<Resource> file(
             @RequestHeader("X-User-Id") String xUserId,
@@ -74,6 +93,7 @@ public class InspectionImageController {
                 .body(r);
     }
 
+    // DELETE /inspections/{inspectionId}/images/{imageId}
     @DeleteMapping("/{imageId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(
@@ -84,5 +104,3 @@ public class InspectionImageController {
         imageService.delete(requireUserId(xUserId), inspectionId, imageId);
     }
 }
-
-
