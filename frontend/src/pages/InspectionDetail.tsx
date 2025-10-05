@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getUser } from "../auth"; // adjust path if needed
 
@@ -598,7 +598,13 @@ export default function InspectionDetail() {
                   <img
                     src={baselineUrl}
                     alt="Baseline"
-                    style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 12 }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      borderRadius: 12,
+                      flex: 1,
+                    }}
                   />
                 ) : (
                   <EmptySlot text="No baseline image" />
@@ -606,15 +612,7 @@ export default function InspectionDetail() {
               </Figure>
 
               <Figure title="Current" date={maintMeta?.uploadedAt}>
-                {maintUrl ? (
-                  <img
-                    src={maintUrl}
-                    alt="Current"
-                    style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 12 }}
-                  />
-                ) : (
-                  <EmptySlot text="No maintenance image" />
-                )}
+                <ZoomableImage src={maintUrl} alt="Current" emptyText="No maintenance image" />
               </Figure>
             </div>
           ) : (
@@ -729,6 +727,252 @@ function iconBtn(disabled: boolean, danger?: boolean): React.CSSProperties {
     color: danger ? "#dc2626" : "#4338ca",
   };
 }
+const zoomBtnStyle = (disabled: boolean): React.CSSProperties => ({
+  padding: "8px 14px",
+  borderRadius: 10,
+  border: `1px solid ${ui.border}`,
+  background: disabled ? "#f8fafc" : "#fff",
+  color: disabled ? "#94a3b8" : ui.text,
+  fontWeight: 800,
+  fontSize: 13,
+  cursor: disabled ? "not-allowed" : "pointer",
+  boxShadow: "0 6px 14px rgba(15,23,42,0.08)",
+  transition: "transform .15s ease, box-shadow .15s ease",
+});
+
+type ZoomableImageProps = {
+  src?: string | null;
+  alt: string;
+  emptyText: string;
+  overlays?: React.ReactNode;
+  onResetOverlays?: () => void;
+};
+
+function ZoomableImage({ src, alt, emptyText, overlays, onResetOverlays }: ZoomableImageProps) {
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [showHint, setShowHint] = useState(true);
+  const dragOrigin = useRef<{ pointerId: number; x: number; y: number; baseX: number; baseY: number } | null>(
+    null,
+  );
+  const hasImage = Boolean(src);
+
+  const isAtDefault = scale === 1 && offset.x === 0 && offset.y === 0;
+  const resetDisabled = !hasImage || isAtDefault;
+
+  useEffect(() => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+    setShowHint(true);
+  }, [src]);
+
+  const zoomIn = useCallback(() => {
+    if (!hasImage) return;
+    setScale((prev) => Math.min(prev + 0.25, 4));
+  }, [hasImage]);
+
+  const zoomOut = useCallback(() => {
+    if (!hasImage) return;
+    setScale((prev) => Math.max(prev - 0.25, 0.5));
+  }, [hasImage]);
+
+  const resetView = useCallback(() => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+    setShowHint(true);
+    dragOrigin.current = null;
+    onResetOverlays?.();
+  }, [onResetOverlays]);
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!hasImage) return;
+      event.preventDefault();
+      const { pointerId, clientX, clientY } = event;
+      dragOrigin.current = { pointerId, x: clientX, y: clientY, baseX: offset.x, baseY: offset.y };
+      setIsDragging(true);
+      setShowHint(false);
+      event.currentTarget.setPointerCapture(pointerId);
+    },
+    [hasImage, offset.x, offset.y],
+  );
+
+  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!hasImage) return;
+    const active = dragOrigin.current;
+    if (!active) return;
+    event.preventDefault();
+    const dx = event.clientX - active.x;
+    const dy = event.clientY - active.y;
+    setOffset({ x: active.baseX + dx, y: active.baseY + dy });
+  }, [hasImage]);
+
+  const clearPointerState = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const active = dragOrigin.current;
+    if (active?.pointerId === event.pointerId) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      dragOrigin.current = null;
+    }
+    setIsDragging(false);
+  }, []);
+
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!hasImage) {
+        setIsDragging(false);
+        return;
+      }
+      clearPointerState(event);
+    },
+    [clearPointerState, hasImage],
+  );
+
+  const handlePointerLeave = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!hasImage) {
+        setIsDragging(false);
+        return;
+      }
+      clearPointerState(event);
+    },
+    [clearPointerState, hasImage],
+  );
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        alignSelf: "stretch",
+        justifySelf: "stretch",
+        minHeight: 0,
+        flex: 1,
+      }}
+    >
+      <div
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        style={{
+          position: "relative",
+          flex: "1 1 auto",
+          minHeight: 280,
+          minWidth: 0,
+          width: "100%",
+          borderRadius: 12,
+          overflow: "hidden",
+          cursor: hasImage ? (isDragging ? "grabbing" : "grab") : "default",
+          touchAction: "none",
+          background: hasImage ? "#0b1a4a" : "rgba(15,23,42,0.25)",
+          display: "flex",
+          alignItems: "stretch",
+        }}
+      >
+        {hasImage ? (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                transformOrigin: "center",
+                transition: isDragging ? "none" : "transform .08s ease-out",
+                willChange: "transform",
+              }}
+            >
+              <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                <img
+                  src={src ?? undefined}
+                  alt={alt}
+                  draggable={false}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    userSelect: "none",
+                    pointerEvents: "none",
+                  }}
+                />
+                {overlays && (
+                  <div style={{ position: "absolute", inset: 0 }}>{overlays}</div>
+                )}
+              </div>
+            </div>
+            {showHint && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 14,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  background: "rgba(15,23,42,0.75)",
+                  color: "#e2e8f0",
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span aria-hidden="true" style={{ fontSize: 14 }}>↔️</span> Drag to move
+              </div>
+            )}
+          </>
+        ) : (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              color: "#cbd5e1",
+              fontWeight: 700,
+            }}
+          >
+            {emptyText}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 700 }}>
+          Tip: Drag the image to reposition.
+        </span>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button type="button" onClick={zoomOut} disabled={!hasImage} style={zoomBtnStyle(!hasImage)}>
+            Zoom Out
+          </button>
+          <button type="button" onClick={resetView} disabled={resetDisabled} style={zoomBtnStyle(resetDisabled)}>
+            Reset View
+          </button>
+          <button type="button" onClick={zoomIn} disabled={!hasImage} style={zoomBtnStyle(!hasImage)}>
+            Zoom In
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Figure({
   title,
@@ -789,6 +1033,8 @@ function Figure({
           borderRadius: 12,
           display: "grid",
           placeItems: "center",
+          width: "100%",
+          minHeight: 320,
           overflow: "hidden",
         }}
       >
