@@ -93,7 +93,7 @@ async def infer(req: InferenceRequest):
             device=req.device,
             imgsz=req.imgsz,
             half=req.half,
-            web_payload=req.web_payload,
+            web_payload=True,
             cfg_overrides=final_overrides,
         )
         return result

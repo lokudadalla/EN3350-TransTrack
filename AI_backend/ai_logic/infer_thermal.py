@@ -280,20 +280,20 @@ def infer_thermal(
 
     web_boxes = [
         {
-            "class": b["finalClass"],
-            "bbox_yolo": to_yolo_norm(b),     # [cx, cy, w, h] normalized
-            "bbox_px":   [b["x"], b["y"], b["w"], b["h"]]  # keep pixels too if you want
+            "x": int(b["x"]),
+            "y": int(b["y"]),
+            "width": int(b["w"]),
+            "height": int(b["h"]),
+            "label": b["finalClass"],
+            "score": round(float(b["detConfidence"]), 4),
+            "size": float(b["w"] * b["h"]),     # pixel area
         }
         for b in refined
     ]
 
-
     if web_payload:
-        result = {
-            "grade": grade,
-            "anomaly_score": float(score),
-            "boxes": web_boxes
-        }
+        # Return ONLY the minimal schema for the frontend
+        result = {"boxes": web_boxes}
     else:
         result = full_result
 
