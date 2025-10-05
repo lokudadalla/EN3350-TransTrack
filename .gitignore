@@ -35,3 +35,11 @@ replay_pid*
 # check 2
 
 .idea/
+#### Images ####
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.svg
