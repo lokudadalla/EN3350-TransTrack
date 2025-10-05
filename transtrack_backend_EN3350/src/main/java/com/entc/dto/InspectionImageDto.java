@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -21,8 +22,43 @@ public class InspectionImageDto {
     private String uploader;
     private EnvironmentCondition condition;
 
+    // NEW: embed anomalies
+    private List<AnomalyDto> anomalies;
+
+    @Data
+    @AllArgsConstructor
+    public static class AnomalyDto {
+        private Long id;
+        private int x, y, width, height;
+        private String label;
+        private Double score;
+        private Double size;
+    }
+
     public static InspectionImageDto from(InspectionImage i) {
-        String url = "/inspections/%d/images/%d/file".formatted(i.getInspection().getInspectionNo(), i.getId());
-        return new InspectionImageDto(i.getId(), i.getType(), i.getFileName(), i.getContentType(), i.getSize(), i.getUploadedAt(), url, i.getUploader(), i.getCondition());
+        String url = "/inspections/%d/images/%d/file"
+                .formatted(i.getInspection().getInspectionNo(), i.getId());
+
+        List<AnomalyDto> anomalyDtos =
+                (i.getAnomalies() == null ? List.of()
+                        : i.getAnomalies().stream()
+                            .map(a -> new AnomalyDto(
+                                    a.getId(),
+                                    a.getX(), a.getY(), a.getWidth(), a.getHeight(),
+                                    a.getLabel(), a.getScore(), a.getSize()))
+                            .toList());
+
+        return new InspectionImageDto(
+                i.getId(),
+                i.getType(),
+                i.getFileName(),
+                i.getContentType(),
+                i.getSize(),
+                i.getUploadedAt(),
+                url,
+                i.getUploader(),
+                i.getCondition(),
+                anomalyDtos
+        );
     }
 }

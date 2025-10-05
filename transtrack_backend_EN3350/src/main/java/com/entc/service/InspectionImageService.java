@@ -65,10 +65,10 @@ public class InspectionImageService {
     }
 
     @Transactional(readOnly = true)
-    public List<InspectionImage> list(Long inspectionId, @Nullable ImageType type) {
+    public List<InspectionImage> list(Long inspectionId, @org.springframework.lang.Nullable ImageType type) {
         return type == null
-                ? imageRepo.findByInspection_InspectionNo(inspectionId)
-                : imageRepo.findByInspection_InspectionNoAndType(inspectionId, type);
+                ? imageRepo.findAllWithAnomalies(inspectionId)
+                : imageRepo.findAllWithAnomaliesByType(inspectionId, type);
     }
 
     @Transactional(readOnly = true)

@@ -66,6 +66,9 @@ public class InspectionServiceImp implements InspectionService {
             if (body.getMaintenanceDate() != null) {
                 existing.setMaintenanceDate(body.getMaintenanceDate());
             }
+            if (body.getInferenceThreshold() != null) {
+                existing.setInferenceThreshold(body.getInferenceThreshold());
+            }
             return inspectionRepository.save(existing);
         }).orElse(null);
     }
