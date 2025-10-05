@@ -7,37 +7,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-<<<<<<< HEAD
-
-=======
->>>>>>> sasindu_frontend
 @Service
 @RequiredArgsConstructor
 public class InspectionServiceImp implements InspectionService {
 
     private final InspectionRepository inspectionRepository;
 
-<<<<<<< HEAD
-    public InspectionServiceImp(InspectionRepository inspectionRepository) {
-        this.inspectionRepository = inspectionRepository;
-    }
-
-    @Override
-    public List<InspectionDetails> getAllInspections(Long userId) {
-        return inspectionRepository.findAllByUserId(userId);
-    }
-
-    @Override
-    public InspectionDetails getById(Long userId, Long id) {
-        return inspectionRepository.findByInspectionNoAndUserId(id, userId)
-                .orElseThrow(() -> new RuntimeException("Inspection not found"));
-    }
-
-    @Override
-    public InspectionDetails create(Long userId, InspectionDetails toCreate) {
-        toCreate.setInspectionNo(null);
-        toCreate.setUserId(userId);                 // <-- stamp owner
-=======
     @Override
     public List<InspectionDetails> getAllInspections(Long userId) {
         return inspectionRepository.findAllByUserId(userId);
@@ -54,7 +29,6 @@ public class InspectionServiceImp implements InspectionService {
         // Server-side ownership
         toCreate.setInspectionNo(null);
         toCreate.setUserId(userId);
->>>>>>> sasindu_frontend
         if (toCreate.getMaintenanceDate() == null) {
             toCreate.setMaintenanceDate("-");
         }

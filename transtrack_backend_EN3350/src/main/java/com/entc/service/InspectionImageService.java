@@ -72,16 +72,10 @@ public class InspectionImageService {
 
     @Transactional(readOnly = true)
     public List<InspectionImage> list(Long userId, Long inspectionId, @Nullable ImageType type) {
-<<<<<<< HEAD
-        return (type == null)
-            ? imageRepo.findByInspection_InspectionNoAndInspection_UserId(inspectionId, userId)
-            : imageRepo.findByInspection_InspectionNoAndInspection_UserIdAndType(inspectionId, userId, type);
-=======
         // Use the user-scoped fetch-join queries to avoid N+1 and return newest first
         return (type == null)
                 ? imageRepo.findAllWithAnomaliesForUser(inspectionId, userId)
                 : imageRepo.findAllWithAnomaliesByTypeForUser(inspectionId, userId, type);
->>>>>>> sasindu_frontend
     }
 
     @Transactional(readOnly = true)

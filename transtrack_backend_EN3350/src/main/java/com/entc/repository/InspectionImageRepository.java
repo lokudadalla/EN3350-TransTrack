@@ -11,9 +11,6 @@ import java.util.Optional;
 
 public interface InspectionImageRepository extends JpaRepository<InspectionImage, Long> {
 
-<<<<<<< HEAD
-    // list for THIS inspection but only if it belongs to THIS user
-=======
     // ---------- Basic finders (no user filter; keep if used elsewhere) ----------
     List<InspectionImage> findByInspection_InspectionNo(Long inspectionNo);
     List<InspectionImage> findByInspection_InspectionNoAndType(Long inspectionNo, ImageType type);
@@ -64,16 +61,12 @@ public interface InspectionImageRepository extends JpaRepository<InspectionImage
                                                             @Param("type") ImageType type);
 
     // ---------- User-scoped helpers ----------
->>>>>>> sasindu_frontend
     List<InspectionImage> findByInspection_InspectionNoAndInspection_UserId(Long inspectionNo, Long userId);
 
     List<InspectionImage> findByInspection_InspectionNoAndInspection_UserIdAndType(
         Long inspectionNo, Long userId, ImageType type);
 
     Optional<InspectionImage> findByIdAndInspection_UserId(Long id, Long userId);
-<<<<<<< HEAD
-}
-=======
 
     // Fetch one image with anomalies (useful after saving anomalies)
     @Query("""
@@ -84,4 +77,3 @@ public interface InspectionImageRepository extends JpaRepository<InspectionImage
            """)
     Optional<InspectionImage> findOneWithAnomalies(@Param("id") Long id);
 }
->>>>>>> sasindu_frontend

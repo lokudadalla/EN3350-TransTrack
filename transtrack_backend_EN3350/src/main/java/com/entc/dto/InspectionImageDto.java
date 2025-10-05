@@ -35,8 +35,6 @@ public class InspectionImageDto {
         private Double size;
     }
 
-<<<<<<< HEAD
-=======
     public static InspectionImageDto from(InspectionImage i) {
         String url = "/inspections/%d/images/%d/file"
                 .formatted(i.getInspection().getInspectionNo(), i.getId());
@@ -64,7 +62,6 @@ public class InspectionImageDto {
         );
     }
 
->>>>>>> sasindu_frontend
     public InspectionImageDto(Long id, ImageType type, String fileName,
             String contentType, long size, LocalDateTime uploadedAt,
             String url, String uploader, EnvironmentCondition condition) {
