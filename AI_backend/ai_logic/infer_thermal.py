@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 from pathlib import Path
-import numpy as np, cv2, json
+import numpy as np, cv2, json, tempfile
 from math import exp
 
 def infer_thermal(
@@ -14,9 +14,10 @@ def infer_thermal(
     web_payload: bool = False,
     half: bool = True,
     cfg_overrides: dict | None = None,
+    temperature_percent: int | None = None,   # <-- slider 0..100
 ):
+    # ------------------- config (with optional overrides) -------------------
     CFG = json.load(open(cfg_path, "r"))
-
     if cfg_overrides:
         def deep_merge(dst, src):
             for k, v in src.items():
@@ -27,7 +28,6 @@ def infer_thermal(
             return dst
         deep_merge(CFG, cfg_overrides)
 
-
     def cfgv(path, default):
         d = CFG
         for k in path.split("."):
@@ -36,7 +36,14 @@ def infer_thermal(
             d = d[k]
         return d
 
-    # --- utils ---
+    # --- slider weight (0..1) for anomaly score blending ---
+    if temperature_percent is None:
+        t = 0.0
+    else:
+        p = max(0, min(100, int(temperature_percent)))
+        t = p / 100.0
+
+    # ------------------------ utils ------------------------
     def load_rgb(path):
         bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if bgr is None: raise FileNotFoundError(path)
@@ -73,7 +80,7 @@ def infer_thermal(
         hsv[...,2] /= 255.0
         return hsv
 
-    # --- per-box classification with warm & hot masks ---
+    # ---------------------- rules: per-box ----------------------
     def classify_box(hsvC, vB, xywh):
         x,y,w,h = map(int, xywh)
         H, W = hsvC.shape[:2]
@@ -134,7 +141,7 @@ def infer_thermal(
             return "Point Overload Faulty" if is_hot else "Loose Joint -potential"
         return "normal"
 
-    # --- global rule probe + box proposal (for fallback) ---
+    # ------------------- global rule probe (fallback) -------------------
     def global_rule_probe(hsvC, vB):
         hC, sC, vC = hsvC[...,0], hsvC[...,1], hsvC[...,2]
         warm_h = (hC <= 0.17) | (hC >= 0.95)
@@ -180,7 +187,7 @@ def infer_thermal(
         "Full wire overload": (255, 0, 0),
     }
 
-    # --- Model + preprocessing ---
+    # ------------------- model + preprocessing -------------------
     model = YOLO(weights)
     cand_raw  = load_rgb(candidate_img)      # YOLO sees original colors
     cand_norm = normalize_palette(cand_raw)  # rules see normalized copy
@@ -194,7 +201,7 @@ def infer_thermal(
 
     hsvC = rgb_to_hsv01(cand_norm)
 
-    # --- YOLO inference ---
+    # ------------------- YOLO inference -------------------
     pred = model.predict(cand_raw, device=device, half=half, imgsz=imgsz, verbose=False)[0]
 
     refined = []
@@ -221,7 +228,7 @@ def infer_thermal(
                 "aspect": float(aspect),
             })
 
-    # --- HYBRID FALLBACK (inside the function!) ---
+    # ------------------- hybrid fallback -------------------
     rule_prob_thr = cfgv("decision.rule_prob_thr", 0.40)
     use_rule_fallback = cfgv("decision.use_rule_only_fallback", True)
     rule_prob, warm_mask = global_rule_probe(hsvC, vB)
@@ -239,7 +246,7 @@ def infer_thermal(
                 final_name = "Point Overload Faulty" if ok_hot else "Loose Joint -potential"
             refined.append({
                 "x": x, "y": y, "w": w, "h": h,
-                "detConfidence": float(rule_prob),
+                "detConfidence": float(rule_prob),  # proxy conf for fallback
                 "ruleCore": rule_core,
                 "isHot": bool(ok_hot),
                 "finalClass": final_name,
@@ -247,7 +254,7 @@ def infer_thermal(
                 "aspect": float(aspect),
             })
 
-    # --- Image-level decision & score ---
+    # ------------------- image-level decision (for full payload) -------------------
     FAULTY = {"Loose Joint -Faulty", "Point Overload Faulty"}
     POT    = {"Loose Joint -potential", "Full wire overload"}
 
@@ -255,49 +262,55 @@ def infer_thermal(
     has_pot    = any(b["finalClass"] in POT for b in refined)
     grade = "faulty" if has_faulty else ("potentially faulty" if has_pot else "normal")
 
+    # legacy image score (kept for full payload)
     weights_for_score = {**{k:1.0 for k in FAULTY}, **{k:0.7 for k in POT}}
-    score = max((weights_for_score[b["finalClass"]]*b["detConfidence"] for b in refined), default=0.0)
+    legacy_image_score = max((weights_for_score[b["finalClass"]]*b["detConfidence"] for b in refined), default=0.0)
 
     full_result = {
         "image": str(candidate_img),
         "grade": grade,
-        "anomaly_score": float(score),
+        "anomaly_score": float(legacy_image_score),  # full payload only
         "boxes": refined,
         "rule_prob": float(rule_prob),
     }
 
-    # --- build YOLO-normalized boxes for web ---
+    # ------------------- web payload (slider-aware per-box score) -------------------
     H, W = cand_raw.shape[:2]
+    web_boxes = []
 
-    def to_yolo_norm(b):
-        x, y, w, h = b["x"], b["y"], b["w"], b["h"]
-        cx = (x + w/2.0) / W
-        cy = (y + h/2.0) / H
-        ww = w / W
-        hh = h / H
-        # (optional) round for cleaner payloads
-        return [round(cx, 6), round(cy, 6), round(ww, 6), round(hh, 6)]
+    for b in refined:
+        det_conf = float(b["detConfidence"])
+        rule_strength = 1.0 if b["isHot"] else float(b["areaFrac"])  # reacts to thresholds
+        per_box_score = (1.0 - t) * det_conf + t * rule_strength
+        per_box_score = max(0.0, min(1.0, per_box_score))
 
-    web_boxes = [
-        {
+        web_boxes.append({
             "x": int(b["x"]),
             "y": int(b["y"]),
             "width": int(b["w"]),
             "height": int(b["h"]),
             "label": str(b["finalClass"]),
-            "score": float(b["detConfidence"]),
-            "size": float(b["w"] * b["h"]),   # pixel area
-        }
-        for b in refined
-    ]
+            "score": round(per_box_score, 4),     # <- slider-aware anomaly score
+            "size": float(b["w"] * b["h"]),
+        })
+        
+    # If web payload requested, return minimal schema. Include image-level score if you want.
+    if web_payload:
+        return {"boxes": web_boxes}
+    else:
+        result = full_result
 
-    result = {"boxes": web_boxes} if web_payload else full_result
-
+    # ------------------- optional annotation -------------------
     if save_annot:
         out = cv2.cvtColor(cand_raw, cv2.COLOR_RGB2BGR).copy()
         for b in refined:
             x,y,w,h = b["x"], b["y"], b["w"], b["h"]
-            color = CLASS_COLORS.get(b["finalClass"], (200,200,200))
+            color = {
+                "Loose Joint -Faulty": (0, 0, 255),
+                "Point Overload Faulty": (0, 128, 255),
+                "Loose Joint -potential": (0, 255, 255),
+                "Full wire overload": (255, 0, 0),
+            }.get(b["finalClass"], (200,200,200))
             cv2.rectangle(out, (x,y), (x+w, y+h), color, 2)
             label = f"{b['finalClass']} {b['detConfidence']:.2f}"
             (tw,th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)

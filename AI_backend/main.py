@@ -26,9 +26,7 @@ class InferenceRequest(BaseModel):
     imgsz: int = 640
     half: bool = False
     web_payload: bool = True
-
     temperature_percent: Optional[int] = None  # e.g., 10, 20, 30, 40
-
     cfg_overrides: Optional[Dict[str, Any]] = None
 
 
@@ -157,6 +155,7 @@ async def infer(req: InferenceRequest):
             half=req.half,
             web_payload=True,  # returns {"boxes":[...]} only
             cfg_overrides=final_overrides,
+            temperature_percent=req.temperature_percent,
         )
         return result
 
