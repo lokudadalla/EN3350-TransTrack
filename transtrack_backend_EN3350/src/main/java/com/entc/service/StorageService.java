@@ -16,6 +16,7 @@ public interface StorageService {
     @Data
     @AllArgsConstructor
     class StoredFile {
+<<<<<<< HEAD
         private String storagePath, fileName, contentType; 
         private long size;
         
@@ -54,5 +55,13 @@ public interface StorageService {
 		public void setSize(long size) {
 			this.size = size;
 		}
+=======
+        private String storagePath;
+        private String fileName;
+        private String contentType;
+        private long size;
+
+        public StoredFile() {} // keep only if you need a no-args ctor (optional)
+>>>>>>> sasindu_frontend
     }
 }

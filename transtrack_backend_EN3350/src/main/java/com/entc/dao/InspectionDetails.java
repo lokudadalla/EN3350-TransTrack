@@ -51,6 +51,9 @@ public class InspectionDetails {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "inference_threshold")
+    private Double inferenceThreshold;
+
     @PrePersist
     void prePersist() {
         if (createdAt == null) {
