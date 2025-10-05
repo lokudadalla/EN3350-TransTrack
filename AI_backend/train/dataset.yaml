@@ -1,0 +1,8 @@
+# data.yaml — dataset configuration for YOLO11
+
+train: C:\Users\Tuf\Downloads\AI Backend\dataset_trans\images\train       # path to training images (relative or absolute)
+val: C:\Users\Tuf\Downloads\AI Backend\dataset_trans\images\valid           # path to validation images
+test: C:\Users\Tuf\Downloads\AI Backend\dataset_trans\images\test         # (optional) path to test images
+
+nc: 5  # number of classes
+names: ['Loose Joint -potential', 'Full wire overload', 'Loose Joint -Faulty', 'Point Overload Faulty', 'normal']
