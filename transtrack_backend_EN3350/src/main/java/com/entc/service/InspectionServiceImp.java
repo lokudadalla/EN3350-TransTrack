@@ -45,14 +45,6 @@ public class InspectionServiceImp implements InspectionService {
     public InspectionDetails update(Long userId, Long id, InspectionDetails body) {
         return inspectionRepository.findByInspectionNoAndUserId(id, userId)
                 .map(existing -> {
-<<<<<<< HEAD
-                    if (body.getTransformerNo() != null) existing.setTransformerNo(body.getTransformerNo());
-                    if (body.getBranch() != null)        existing.setBranch(body.getBranch());
-                    if (body.getStatus() != null)        existing.setStatus(body.getStatus());
-                    if (body.getInspectionTime() != null) existing.setInspectionTime(body.getInspectionTime());
-                    if (body.getInspectionDate() != null) existing.setInspectionDate(body.getInspectionDate());
-                    if (body.getMaintenanceDate() != null) existing.setMaintenanceDate(body.getMaintenanceDate());
-=======
                     if (body.getTransformerNo() != null)   existing.setTransformerNo(body.getTransformerNo());
                     if (body.getBranch() != null)           existing.setBranch(body.getBranch());
                     if (body.getStatus() != null)           existing.setStatus(body.getStatus());
@@ -65,7 +57,6 @@ public class InspectionServiceImp implements InspectionService {
                     }
                     // never allow userId changes via update
                     existing.setUserId(userId);
->>>>>>> sasindu_frontend
                     return inspectionRepository.save(existing);
                 })
                 .orElse(null);
@@ -73,13 +64,8 @@ public class InspectionServiceImp implements InspectionService {
 
     @Override
     public void delete(Long userId, Long id) {
-<<<<<<< HEAD
-        inspectionRepository.findByInspectionNoAndUserId(id, userId)
-                .ifPresent(inspectionRepository::delete);
-=======
         var existing = inspectionRepository.findByInspectionNoAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Inspection not found or not owned by user"));
         inspectionRepository.delete(existing);
->>>>>>> sasindu_frontend
     }
 }
