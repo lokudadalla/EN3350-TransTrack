@@ -31,13 +31,10 @@ replay_pid*
 
 /node_modules/
 
-<<<<<<< HEAD
 #new changes... (check fork)
 # check 2
 
 .idea/
-=======
->>>>>>> sasindu_frontend
 #### Images ####
 *.png
 *.jpg
@@ -45,8 +42,8 @@ replay_pid*
 *.gif
 *.bmp
 *.tiff
-<<<<<<< HEAD
 *.svg
-=======
 *.svg
->>>>>>> sasindu_frontend
+
+#### Python cache ####
+__pycache__/
