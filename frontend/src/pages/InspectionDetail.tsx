@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getUser } from "../auth"; // adjust path if needed
 
@@ -48,6 +48,12 @@ type TransformerHeader = {
   inspectedBy?: string;
   status: Status;
   lastUpdated: string;
+};
+
+type ZoomHandle = {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetView: () => void;
 };
 
 const ui = {
@@ -363,6 +369,10 @@ export default function InspectionDetail() {
 
   const thermalStatus: Status = (maintMeta || maintUrl) ? "Completed" : (showUpload ? "In Progress" : "Pending");
 
+  // shared zoom ref for maintenance image
+  const zoomRef = useRef<ZoomHandle | null>(null);
+  const hasMaint = Boolean(maintUrl);
+
   /* ----- Render ----- */
   return (
     <div style={{ background: ui.bg, minHeight: "100vh", padding: 24 }}>
@@ -585,36 +595,80 @@ export default function InspectionDetail() {
           <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Thermal Image Comparison</div>
 
           {baselineUrl || maintUrl ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 16,
-                alignItems: "stretch",
-              }}
-            >
-              <Figure title="Baseline" date={baselineMeta?.uploadedAt}>
-                {baselineUrl ? (
-                  <img
-                    src={baselineUrl}
-                    alt="Baseline"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                      borderRadius: 12,
-                      flex: 1,
-                    }}
-                  />
-                ) : (
-                  <EmptySlot text="No baseline image" />
-                )}
-              </Figure>
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 16,
+                  alignItems: "stretch",
+                }}
+              >
+                <Figure title="Baseline" date={baselineMeta?.uploadedAt}>
+                  {baselineUrl ? (
+                    <img
+                      src={baselineUrl}
+                      alt="Baseline"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        borderRadius: 12,
+                        flex: 1,
+                      }}
+                    />
+                  ) : (
+                    <EmptySlot text="No baseline image" />
+                  )}
+                </Figure>
 
-              <Figure title="Current" date={maintMeta?.uploadedAt}>
-                <ZoomableImage src={maintUrl} alt="Current" emptyText="No maintenance image" />
-              </Figure>
-            </div>
+                <Figure title="Current" date={maintMeta?.uploadedAt}>
+                  <ZoomableImage ref={zoomRef} src={maintUrl} alt="Current" emptyText="No maintenance image" />
+                </Figure>
+              </div>
+
+              {/* Shared zoom control bar below the two images */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginTop: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 700 }}>
+                  Tip: Drag the image to reposition.
+                </span>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => zoomRef.current?.zoomOut()}
+                    disabled={!hasMaint}
+                    style={zoomBtnStyle(!hasMaint)}
+                  >
+                    Zoom Out
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => zoomRef.current?.resetView()}
+                    disabled={!hasMaint}
+                    style={zoomBtnStyle(!hasMaint)}
+                  >
+                    Reset View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => zoomRef.current?.zoomIn()}
+                    disabled={!hasMaint}
+                    style={zoomBtnStyle(!hasMaint)}
+                  >
+                    Zoom In
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div style={{ color: ui.sub, fontWeight: 700 }}>
               Upload a Baseline and a Maintenance image to see the side-by-side comparison.
@@ -748,7 +802,10 @@ type ZoomableImageProps = {
   onResetOverlays?: () => void;
 };
 
-function ZoomableImage({ src, alt, emptyText, overlays, onResetOverlays }: ZoomableImageProps) {
+const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function ZoomableImage(
+  { src, alt, emptyText, overlays, onResetOverlays }: ZoomableImageProps,
+  ref
+) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -757,9 +814,6 @@ function ZoomableImage({ src, alt, emptyText, overlays, onResetOverlays }: Zooma
     null,
   );
   const hasImage = Boolean(src);
-
-  const isAtDefault = scale === 1 && offset.x === 0 && offset.y === 0;
-  const resetDisabled = !hasImage || isAtDefault;
 
   useEffect(() => {
     setScale(1);
@@ -784,6 +838,9 @@ function ZoomableImage({ src, alt, emptyText, overlays, onResetOverlays }: Zooma
     dragOrigin.current = null;
     onResetOverlays?.();
   }, [onResetOverlays]);
+
+  // expose controls to parent
+  useImperativeHandle(ref, () => ({ zoomIn, zoomOut, resetView }), [zoomIn, zoomOut, resetView]);
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -945,34 +1002,10 @@ function ZoomableImage({ src, alt, emptyText, overlays, onResetOverlays }: Zooma
           </div>
         )}
       </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <span style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 700 }}>
-          Tip: Drag the image to reposition.
-        </span>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button type="button" onClick={zoomOut} disabled={!hasImage} style={zoomBtnStyle(!hasImage)}>
-            Zoom Out
-          </button>
-          <button type="button" onClick={resetView} disabled={resetDisabled} style={zoomBtnStyle(resetDisabled)}>
-            Reset View
-          </button>
-          <button type="button" onClick={zoomIn} disabled={!hasImage} style={zoomBtnStyle(!hasImage)}>
-            Zoom In
-          </button>
-        </div>
-      </div>
+      {/* Note: local zoom buttons removed; controlled by parent */}
     </div>
   );
-}
+});
 
 function Figure({
   title,
