@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-
 @Service
 @RequiredArgsConstructor
 public class InspectionImageService {
@@ -25,12 +24,6 @@ public class InspectionImageService {
     private final InspectionRepository inspectionRepo;
     private final InspectionImageRepository imageRepo;
     private final StorageService storage;
-    
-    public InspectionImageService(InspectionRepository inspectionRepo,InspectionImageRepository imageRepo,StorageService storage) {
-    	this.inspectionRepo = inspectionRepo;
-    	this.imageRepo = imageRepo;
-		this.storage = storage;
-    }
 
     @Transactional
     public List<InspectionImage> upload(Long userId, Long inspectionId, ImageType type,
