@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from pathlib import Path
 
-from AI_backend.ai_logic.infer_thermal import infer_thermal
+from ai_logic.infer_thermal import infer_thermal
 from typing import Dict, Any, Optional
 import os, tempfile, requests
 from urllib.parse import urlparse
@@ -13,22 +13,24 @@ APP_PUBLIC_BASE = os.getenv("APP_PUBLIC_BASE", "http://localhost:8080")
 
 app = FastAPI(title="Transformer AI Backend")
 
-BASE_DIR    = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent
 WEIGHTS_PATH = BASE_DIR / "ai_logic" / "best.pt"
-CFG_PATH     = BASE_DIR / "ai_logic" / "cfg" / "config_global.json"
+CFG_PATH = BASE_DIR / "ai_logic" / "cfg" / "config_global.json"
+
 
 class InferenceRequest(BaseModel):
     maintenance_image_path: str
-    baseline_image_path: Optional[str] = None      # optional
-    save_annot: Optional[str] = None               # optional file path to save preview
-    device: int = 0                                # 0=GPU, -1=CPU
+    baseline_image_path: Optional[str] = None  # optional
+    save_annot: Optional[str] = None  # optional file path to save preview
+    device: int = 0  # 0=GPU, -1=CPU
     imgsz: int = 640
     half: bool = True
-    web_payload: bool = True  
-    
-    temperature_percent: Optional[int] = None   # e.g., 10, 20, 30, 40
+    web_payload: bool = True
+
+    temperature_percent: Optional[int] = None  # e.g., 10, 20, 30, 40
 
     cfg_overrides: Optional[Dict[str, Any]] = None
+
 
 def _is_url(s: str) -> bool:
     try:
@@ -36,6 +38,7 @@ def _is_url(s: str) -> bool:
         return u.scheme in ("http", "https")
     except:
         return False
+
 
 def _fetch_to_local(path_or_id: str) -> str:
     """
@@ -64,13 +67,16 @@ def _fetch_to_local(path_or_id: str) -> str:
     # Guess an extension if you can; fallback to .jpg
     suffix = ".jpg"
     ct = resp.headers.get("Content-Type", "")
-    if "png" in ct: suffix = ".png"
-    elif "jpeg" in ct or "jpg" in ct: suffix = ".jpg"
+    if "png" in ct:
+        suffix = ".png"
+    elif "jpeg" in ct or "jpg" in ct:
+        suffix = ".jpg"
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     tmp.write(resp.content)
     tmp.close()
-    return tmp.name    
+    return tmp.name
+
 
 def build_overrides_linear(pct: Optional[int]) -> Dict[str, Any]:
     if pct is None:
@@ -81,24 +87,27 @@ def build_overrides_linear(pct: Optional[int]) -> Dict[str, Any]:
     t = p / 100.0
 
     # ---- TUNING RANGES (edit these as you like) ----
-    low  =  {"color": {"dv_min": 0.08, "dl_min": 0.05},
-             "color_hot": {"dv_min_hot": 0.15}}
-    high = {"color": {"dv_min": 0.22, "dl_min": 0.14},
-            "color_hot": {"dv_min_hot": 0.30}}
+    low = {"color": {"dv_min": 0.08, "dl_min": 0.05}, "color_hot": {"dv_min_hot": 0.15}}
+    high = {
+        "color": {"dv_min": 0.22, "dl_min": 0.14},
+        "color_hot": {"dv_min_hot": 0.30},
+    }
     # -----------------------------------------------
 
-    def lerp(a, b): return a + t * (b - a)
+    def lerp(a, b):
+        return a + t * (b - a)
 
     return {
         "color": {
-            "dv_min":     round(lerp(low["color"]["dv_min"],     high["color"]["dv_min"]),  4),
-            "dl_min":     round(lerp(low["color"]["dl_min"],     high["color"]["dl_min"]),  4),
+            "dv_min": round(lerp(low["color"]["dv_min"], high["color"]["dv_min"]), 4),
+            "dl_min": round(lerp(low["color"]["dl_min"], high["color"]["dl_min"]), 4),
         },
         "color_hot": {
-            "dv_min_hot": round(lerp(low["color_hot"]["dv_min_hot"], high["color_hot"]["dv_min_hot"]), 4),
+            "dv_min_hot": round(
+                lerp(low["color_hot"]["dv_min_hot"], high["color_hot"]["dv_min_hot"]), 4
+            ),
         },
     }
-
 
 
 @app.post("/infer")
@@ -106,9 +115,13 @@ async def infer(req: InferenceRequest):
     try:
         # Only check model/config files on disk
         if not WEIGHTS_PATH.exists():
-            raise HTTPException(status_code=500, detail="YOLO weights not found on server")
+            raise HTTPException(
+                status_code=500, detail="YOLO weights not found on server"
+            )
         if not CFG_PATH.exists():
-            raise HTTPException(status_code=500, detail="Config file not found on server")
+            raise HTTPException(
+                status_code=500, detail="Config file not found on server"
+            )
 
         # Turn whatever we got (local path, URL, or DB id) into local temp files
         maintenance_local = _fetch_to_local(req.maintenance_image_path)
@@ -122,6 +135,7 @@ async def infer(req: InferenceRequest):
         # Optional raw overrides from caller (let them win if provided)
         final_overrides = dict(percent_overrides)
         if req.cfg_overrides:
+
             def deep_merge(dst, src):
                 for k, v in src.items():
                     if isinstance(v, dict) and isinstance(dst.get(k), dict):
@@ -129,6 +143,7 @@ async def infer(req: InferenceRequest):
                     else:
                         dst[k] = v
                 return dst
+
             deep_merge(final_overrides, req.cfg_overrides)
 
         result = infer_thermal(
@@ -140,7 +155,7 @@ async def infer(req: InferenceRequest):
             device=req.device,
             imgsz=req.imgsz,
             half=req.half,
-            web_payload=True,          # returns {"boxes":[...]} only
+            web_payload=True,  # returns {"boxes":[...]} only
             cfg_overrides=final_overrides,
         )
         return result
