@@ -21,6 +21,6 @@ public interface StorageService {
         private String contentType;
         private long size;
 
-        public StoredFile() {} // keep only if you need a no-args ctor (optional)
+        public StoredFile() {} // keep only if your impl needs a no-args ctor (optional)
     }
 }

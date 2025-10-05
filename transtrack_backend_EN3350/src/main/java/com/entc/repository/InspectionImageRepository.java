@@ -68,6 +68,9 @@ public interface InspectionImageRepository extends JpaRepository<InspectionImage
 
     Optional<InspectionImage> findByIdAndInspection_UserId(Long id, Long userId);
 
+    Optional<InspectionImage> findTopByInspection_InspectionNoAndTypeOrderByUploadedAtDesc(
+        Long inspectionNo, ImageType type);
+
     // Fetch one image with anomalies (useful after saving anomalies)
     @Query("""
            select i

@@ -23,5 +23,7 @@ public class InspectionImageAnomaly {
 
     private String label;
     private Double score;
+
+    @Column(name = "size")
     private Double size;
 }

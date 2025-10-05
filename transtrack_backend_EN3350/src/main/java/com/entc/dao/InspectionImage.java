@@ -49,90 +49,11 @@ public class InspectionImage {
     @Column(nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
-    // NEW: link to anomalies (one image → many anomalies)
-    @OneToMany(mappedBy = "inspectionImage",
-               fetch = FetchType.LAZY,
-               cascade = CascadeType.ALL,
-               orphanRemoval = true)
+    @OneToMany(mappedBy = "inspectionImage", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<InspectionImageAnomaly> anomalies = new ArrayList<>();
-	public Long getId() {
-		return id;
-	}
 
-	public void setId(Long id) {
-		this.id = id;
-	}
-
-	public InspectionDetails getInspection() {
-		return inspection;
-	}
-
-	public void setInspection(InspectionDetails inspection) {
-		this.inspection = inspection;
-	}
-
-	public ImageType getType() {
-		return type;
-	}
-
-	public void setType(ImageType type) {
-		this.type = type;
-	}
-
-	public String getFileName() {
-		return fileName;
-	}
-
-	public void setFileName(String fileName) {
-		this.fileName = fileName;
-	}
-
-	public String getStoragePath() {
-		return storagePath;
-	}
-
-	public void setStoragePath(String storagePath) {
-		this.storagePath = storagePath;
-	}
-
-	public String getUploader() {
-		return uploader;
-	}
-
-	public void setUploader(String uploader) {
-		this.uploader = uploader;
-	}
-
-	public EnvironmentCondition getCondition() {
-		return condition;
-	}
-
-	public void setCondition(EnvironmentCondition condition) {
-		this.condition = condition;
-	}
-
-	public String getContentType() {
-		return contentType;
-	}
-
-	public void setContentType(String contentType) {
-		this.contentType = contentType;
-	}
-
-	public long getSize() {
-		return size;
-	}
-
-	public void setSize(long size) {
-		this.size = size;
-	}
-
-	public LocalDateTime getUploadedAt() {
-		return uploadedAt;
-	}
-
-	public void setUploadedAt(LocalDateTime uploadedAt) {
-		this.uploadedAt = uploadedAt;
-	}
+    // Explicit getters for anomalies (in case Lombok/IDE got confused previously)
+    public List<InspectionImageAnomaly> getAnomalies() { return anomalies; }
+    public void setAnomalies(List<InspectionImageAnomaly> anomalies) { this.anomalies = anomalies; }
 }
 
