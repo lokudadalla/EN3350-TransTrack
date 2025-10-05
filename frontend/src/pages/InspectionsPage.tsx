@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTransformerByNo } from "../api/transformers";
 import { REGIONS_SL } from "../constants/regions";
+import { getUser } from "../auth";
 
 // Types
 type Status = "Completed" | "In Progress" | "Pending";
@@ -139,8 +140,13 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const api = (p: string) => `${API_BASE}${p}`;
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const u = getUser();
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-User-Id": u?.id ? String(u.id) : "",   // <— key line
+      ...(init?.headers || {}),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -219,21 +225,35 @@ function mapDTOtoUI(d: InspectionDTO): Inspection {
   };
 }
 
-async function resolveImageUrl(inspectionId: number, meta: ImageMeta, setUrl: (u: string) => void) {
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
+  const u = getUser();
+  if (u && Number.isFinite(u.id)) h["X-User-Id"] = String(u.id);
+  return h;
+}
+
+async function resolveImageUrl(
+  inspectionId: number,
+  meta: ImageMeta,
+  setUrl: (u: string) => void
+) {
   try {
-    if (meta.url) {
-      const full = meta.url.startsWith("http") ? meta.url : `${API_BASE}${meta.url}`;
-      setUrl(full);
-      return;
-    }
-    const res = await fetch(api(`/inspections/${inspectionId}/images/${meta.id}/file`));
-    if (!res.ok) throw new Error("failed");
+    // Build endpoint: if meta.url exists, still fetch it with headers
+    const endpoint = meta.url
+      ? (meta.url.startsWith("http") ? meta.url : `${API_BASE}${meta.url}`)
+      : api(`/inspections/${inspectionId}/images/${meta.id}/file`);
+
+    const res = await fetch(endpoint, { headers: authHeaders() });
+    if (!res.ok) throw new Error("Failed to fetch image");
+
     const blob = await res.blob();
-    setUrl(URL.createObjectURL(blob));
+    setUrl(URL.createObjectURL(blob));   // set <img src={urlFromState}>
   } catch {
     setUrl("");
   }
 }
+
 
 // Component
 export default function InspectionsPage() {
@@ -336,7 +356,7 @@ export default function InspectionsPage() {
         }
         const metas: { meta: ImageMeta; owner: number }[] = await Promise.all(
           mine.map(async (m) => {
-            const r = await fetch(api(`/inspections/${m.inspectionNo}/images?type=BASELINE`));
+            const r = await fetch(api(`/inspections/${m.inspectionNo}/images?type=BASELINE`), {headers: {...authHeaders()}});
             if (!r.ok) return null as any;
             const arr: ImageMeta[] = await r.json();
             const latest =
@@ -412,7 +432,10 @@ export default function InspectionsPage() {
       activeXhr.current = null;
     };
     xhr.open("POST", urlObj.toString(), true);
+    const u = getUser();
+    if (u && Number.isFinite(u.id)) xhr.setRequestHeader("X-User-Id", String(u.id));
     xhr.send(fd);
+
     e.currentTarget.value = "";
   }
   function viewBaseline() {

@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { getUser } from "../auth"; // adjust path if needed
+
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
+  const u = getUser();
+  if (u && typeof u.id === "number" && Number.isFinite(u.id)) {
+    h["X-User-Id"] = String(u.id);
+  }
+  return h; // always a simple object of string->string
+}
+
+
 
 /* ---------- Types ---------- */
 type Status = "Completed" | "In Progress" | "Pending";
@@ -96,19 +109,21 @@ function Chip({ title, value }: { title: string; value?: string }) {
   );
 }
 
+
 async function resolveImageUrl(ownerInspectionId: number, meta: ImageMeta, setUrl: (u: string) => void) {
   try {
-    if (meta.url) {
-      const full = meta.url.startsWith("http") ? meta.url : `${API_BASE}${meta.url}`;
-      setUrl(full);
-      return;
-    }
-    const res = await fetch(api(`/inspections/${ownerInspectionId}/images/${meta.id}/file`));
+    const endpoint = meta.url
+      ? (meta.url.startsWith("http") ? meta.url : `${API_BASE}${meta.url}`)
+      : api(`/inspections/${ownerInspectionId}/images/${meta.id}/file`);
+
+    const res = await fetch(endpoint, { headers: authHeaders() });
     if (!res.ok) throw new Error("Failed to fetch image");
     const blob = await res.blob();
     setUrl(URL.createObjectURL(blob));
   } catch {}
 }
+
+
 
 /* ---------- Page ---------- */
 export default function InspectionDetail() {
@@ -159,7 +174,9 @@ export default function InspectionDetail() {
             lastUpdated: fromState.inspectedDate,
           }));
         } else {
-          const res = await fetch(api(`/inspections/${numericInspectionId}`));
+          const res = await fetch(api(`/inspections/${numericInspectionId}`), {
+          headers: { ...authHeaders() }, 
+        });
           if (!res.ok) throw new Error(`Failed to load inspection ${numericInspectionId}`);
           const dto: InspectionDTO = await res.json();
           setHeader({
@@ -186,7 +203,9 @@ export default function InspectionDetail() {
 
     async function latestBaselineForTransformer(): Promise<{ meta: ImageMeta; owner: number } | null> {
       if (!transformerId) return null;
-      const insRes = await fetch(api(`/inspections/by-no?no=${encodeURIComponent(transformerId)}`));
+      const insRes = await fetch(api(`/inspections/by-no?no=${encodeURIComponent(transformerId)}`), {
+          headers: { ...authHeaders() }, 
+        });
       if (!insRes.ok) return null;
       const list: InspectionDTO[] = await insRes.json();
       list.sort((a, b) => {
@@ -200,7 +219,9 @@ export default function InspectionDetail() {
       });
       const metas: { meta: ImageMeta; owner: number }[] = [];
       for (const it of list) {
-        const r = await fetch(api(`/inspections/${it.inspectionNo}/images?type=BASELINE`));
+        const r = await fetch(api(`/inspections/${it.inspectionNo}/images?type=BASELINE`), {
+          headers: { ...authHeaders() }, 
+        });
         if (!r.ok) continue;
         const arr: ImageMeta[] = await r.json();
         if (arr?.length) {
@@ -215,7 +236,9 @@ export default function InspectionDetail() {
     }
 
     async function maintenanceForThisInspection(): Promise<ImageMeta | null> {
-      const r = await fetch(api(`/inspections/${numericInspectionId}/images?type=MAINTENANCE`));
+      const r = await fetch(api(`/inspections/${numericInspectionId}/images?type=MAINTENANCE`), {
+          headers: { ...authHeaders() }, 
+        });
       if (!r.ok) return null;
       const arr: ImageMeta[] = await r.json();
       if (!arr?.length) return null;
@@ -267,7 +290,7 @@ export default function InspectionDetail() {
     if (!meta) return;
     if (!confirm("Delete this image?")) return;
     const owner = meta.type === "BASELINE" ? baselineOwnerInspectionId ?? numericInspectionId : numericInspectionId;
-    const res = await fetch(api(`/inspections/${owner}/images/${meta.id}`), { method: "DELETE" });
+    const res = await fetch(api(`/inspections/${owner}/images/${meta.id}`), { method: "DELETE", headers: authHeaders() });
     if (res.status === 204) onDone();
     else alert("Delete failed");
   }
@@ -310,6 +333,10 @@ export default function InspectionDetail() {
       activeXhr.current = null;
     };
     xhr.open("POST", url.toString(), true);
+    const u = getUser();
+    if (u && typeof u.id === "number" && Number.isFinite(u.id)) {
+      xhr.setRequestHeader("X-User-Id", String(u.id));
+    }
     xhr.send(fd);
   }
 

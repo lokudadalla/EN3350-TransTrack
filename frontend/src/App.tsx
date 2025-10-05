@@ -8,9 +8,19 @@ import SegmentTabs from "./components/SegmentTabs";
 import UserMenu from "./components/UserMenu";
 import "./index.css";
 
+// App.tsx
+import { isAuthed, logout, getUser } from "./auth";
+import { Navigate} from "react-router-dom";
+
 export default function App() {
+  if (!isAuthed()) return <Navigate to="/login" replace />;  // <-- add this line
+
   const location = useLocation();
   const navigate = useNavigate();
+  const user = getUser();
+
+  const email = user?.username ?? " ";
+  const name = email.split("@")[0];
 
   const active = location.pathname.startsWith("/inspections")
     ? "inspections"
@@ -55,7 +65,7 @@ export default function App() {
         </div>
 
         {/* User menu ) */}
-        <UserMenu
+        {/* <UserMenu
           user={{
             name: "Trans Track",
             email: "transtrack@gmail.com",
@@ -64,7 +74,34 @@ export default function App() {
           }}
           onNavigateProfile={() => navigate("/profile")}
           onSignOut={() => alert("Sign out: plug your auth here")}
+        /> */}
+        {/* // In your <UserMenu ... /> */}
+        {/* <UserMenu
+          user={{
+            name: "Trans Track",
+            email: "transtrack@gmail.com",
+            avatarUrl: "https://i.pravatar.cc/64?img=12",
+          }}
+          onNavigateProfile={() => navigate("/profile")}
+          onSignOut={() => {           // <-- change this
+            logout();
+            navigate("/login", { replace: true });
+          }}
+        /> */}
+
+        <UserMenu
+          user={{
+            name,          // e.g. "T"
+            email,         // full email
+            avatarUrl: `https://i.pravatar.cc/64?u=${encodeURIComponent(email)}`, 
+          }}
+          onNavigateProfile={() => navigate("/profile")}
+          onSignOut={() => {
+            logout();
+            navigate("/login", { replace: true });
+          }}
         />
+
       </header>
 
       {/* Line 2 — Segmented tabs */}

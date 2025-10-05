@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface InspectionImageRepository extends JpaRepository<InspectionImage, Long> {
     // existing
@@ -30,4 +31,13 @@ public interface InspectionImageRepository extends JpaRepository<InspectionImage
            """)
     List<InspectionImage> findAllWithAnomaliesByType(@Param("inspectionNo") Long inspectionNo,
                                                      @Param("type") ImageType type);
+}
+
+    // list for THIS inspection but only if it belongs to THIS user
+    List<InspectionImage> findByInspection_InspectionNoAndInspection_UserId(Long inspectionNo, Long userId);
+
+    List<InspectionImage> findByInspection_InspectionNoAndInspection_UserIdAndType(
+        Long inspectionNo, Long userId, ImageType type);
+
+    Optional<InspectionImage> findByIdAndInspection_UserId(Long id, Long userId);
 }
