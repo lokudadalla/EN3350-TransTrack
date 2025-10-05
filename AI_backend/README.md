@@ -7,14 +7,14 @@ Designed to be called from a **Java (Spring Boot) backend**, which is triggered 
 
 ## Architecture
 
+
 ```mermaid
 graph TD
-    A[Frontend (uploads / selects images)] --> B[Java Backend (Spring Boot)]
-    B -->|Stores / serves images GET /files/{id}| C[Java Backend API]
-    C -->|Calls /infer| D[Python AI Backend (this project)]
-    D --> E[FastAPI]
-    E --> F[YOLO + CV2 Rules]
-    F --> G[Returns boxes / labels / scores]
+    A[Frontend] --> B[Java Backend]
+    B --> C[Python AI Backend]
+    C --> D[FastAPI Server]
+    D --> E[YOLO + Rule Logic]
+    E --> F[Anomaly Results]
 
 
 
