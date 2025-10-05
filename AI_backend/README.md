@@ -10,18 +10,14 @@ Designed to be called from a **Java (Spring Boot) backend**, which is triggered 
 ```mermaid
 graph TD
     A[Frontend] --> B[Java Backend]
-    B --> C[Python AI Backend]
-    C --> D[FastAPI Server]
-    D --> E[YOLO + Rule Logic]
-    E --> F[Anomaly Results]
+    B --> C[Python AI Backend - FastAPI Server]
 
 
-
-
----
+```
 
 ## Folder Structure
 
+```
 AI_backend/
 ├── main.py                       # FastAPI app exposing /infer
 ├── ai_logic/
@@ -33,7 +29,7 @@ AI_backend/
     ├── aiTXyoloXrule.ipynb           # (Optional) notebook used to train
     └── dataset.yaml / *           # (Optional)
 
-
+```
 
 
 > **Note:** `main.py` expects weights and config at `ai_logic/best.pt` and `ai_logic/cfg/config_global.json`.
@@ -49,12 +45,14 @@ AI_backend/
   ```bash
   pip install fastapi uvicorn ultralytics opencv-python numpy requests
 
-
+  ```
 
 ## Run the Server
 
+  ```bash
 uvicorn main:app --host 0.0.0.0 --port 8000
-**Note:** try with Swagger UI: http://localhost:8000/docs
+```
+> **Note:** try with Swagger UI: http://localhost:8000/docs
 
 
 ### API
@@ -64,6 +62,7 @@ Runs anomaly detection and returns boxes suitable for web rendering.
 
 ### Request Body (Pydantic model: InferenceRequest)
 
+```
 
 {
   "maintenance_image_path": "http://localhost:8080/files/123",
@@ -78,10 +77,12 @@ Runs anomaly detection and returns boxes suitable for web rendering.
     "color": { "dv_min": 0.1 }
   }
 }
-
+```
 
 
 ### Response (when web_payload: true)
+
+```
 {
   "boxes": [
     {
@@ -96,7 +97,7 @@ Runs anomaly detection and returns boxes suitable for web rendering.
   ],
   "annotated": "outputs/annotated.jpg"
 }
-
+```
 
 ### Labels Returned
 
@@ -143,3 +144,4 @@ model.train(
     hsv_s=0.10,
     hsv_v=0.10
 )
+```
