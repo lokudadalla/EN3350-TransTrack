@@ -9,12 +9,13 @@ Designed to be called from a **Java (Spring Boot) backend**, which is triggered 
 
 ```mermaid
 graph TD
-    A[Frontend<br>(uploads/selects images)] --> B[Java Backend (Spring Boot)]
-    B -->|Stores/serves images<br>e.g., GET /files/{id}| C[Java Backend API]
-    C -->|Calls /infer| D[Python AI Backend<br>(this project)]
+    A[Frontend (uploads / selects images)] --> B[Java Backend (Spring Boot)]
+    B -->|Stores / serves images<br>GET /files/{id}| C[Java Backend API]
+    C -->|Calls /infer| D[Python AI Backend (this project)]
     D --> E[FastAPI]
     E --> F[YOLO + CV2 Rules]
     F --> G[Returns boxes / labels / scores]
+
 
 
 ---
