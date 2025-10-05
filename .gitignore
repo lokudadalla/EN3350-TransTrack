@@ -31,6 +31,10 @@ replay_pid*
 
 /node_modules/
 
+#new changes... (check fork)
+# check 2
+
+.idea/
 #### Images ####
 *.png
 *.jpg
