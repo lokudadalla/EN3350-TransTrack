@@ -43,6 +43,10 @@ def infer_thermal(
         p = max(0, min(100, int(temperature_percent)))
         t = p / 100.0
 
+    base_gate = cfgv("temperature.base_gate", 0.0)   # gate at t=0
+    max_gate  = cfgv("temperature.max_gate", 0.60)   # gate at t=1
+    gate = base_gate + t * (max_gate - base_gate)
+    
     # ------------------------ utils ------------------------
     def load_rgb(path):
         bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
@@ -280,7 +284,14 @@ def infer_thermal(
 
     for b in refined:
         det_conf = float(b["detConfidence"])
-        rule_strength = 1.0 if b["isHot"] else float(b["areaFrac"])  # reacts to thresholds
+        # Thermal strength reacts to your rules & thresholds:
+        rule_strength = 1.0 if b["isHot"] else float(b["areaFrac"])
+
+        # NEW: drop boxes that don't meet the temperature gate
+        if rule_strength < gate:
+            continue
+
+        # Blended per-box score (what your frontend shows)
         per_box_score = (1.0 - t) * det_conf + t * rule_strength
         per_box_score = max(0.0, min(1.0, per_box_score))
 
@@ -290,11 +301,10 @@ def infer_thermal(
             "width": int(b["w"]),
             "height": int(b["h"]),
             "label": str(b["finalClass"]),
-            "score": round(per_box_score, 4),     # <- slider-aware anomaly score
+            "score": round(per_box_score, 4),
             "size": float(b["w"] * b["h"]),
         })
-        
-    # If web payload requested, return minimal schema. Include image-level score if you want.
+
     if web_payload:
         return {"boxes": web_boxes}
     else:
