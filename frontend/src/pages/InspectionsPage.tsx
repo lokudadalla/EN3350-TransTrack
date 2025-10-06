@@ -403,6 +403,7 @@ export default function InspectionsPage() {
     const f = e.target.files?.[0];
     if (!f) return;
     const targetInspectionId = ownedInspectionIds[0];
+    console.log({ targetInspectionId });
     if (!targetInspectionId) {
       alert("Please create an inspection first.");
       e.currentTarget.value = "";
