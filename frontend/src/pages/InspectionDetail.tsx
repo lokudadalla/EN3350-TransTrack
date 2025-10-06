@@ -12,8 +12,6 @@ function authHeaders(): Record<string, string> {
   return h; // always a simple object of string->string
 }
 
-
-
 /* ---------- Types ---------- */
 type Status = "Completed" | "In Progress" | "Pending";
 type ImageType = "BASELINE" | "MAINTENANCE";
@@ -27,6 +25,18 @@ type InspectionDTO = {
   inspectionDate: string;
   inspectionTime: string;
   createdAt: string;
+  inferenceThreshold?: number;
+};
+
+type AnomalyMeta = {
+  id?: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string;
+  score?: number;
+  size?: number;
 };
 
 type ImageMeta = {
@@ -39,6 +49,7 @@ type ImageMeta = {
   url?: string;
   uploader?: string;
   condition?: Condition;
+  anomalies?: AnomalyMeta[];
 };
 
 type TransformerHeader = {
@@ -77,6 +88,43 @@ const ui = {
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const api = (p: string) => `${API_BASE}${p}`;
 
+// replaces the old fetchImageMeta (works with your backend)
+async function fetchImageMeta(ownerInspectionId: number, imageId: number): Promise<ImageMeta | null> {
+  try {
+    const res = await fetch(api(`/inspections/${ownerInspectionId}/images?type=MAINTENANCE`), {
+      headers: authHeaders(),
+    });
+    if (!res.ok) return null;
+    const arr: ImageMeta[] = await res.json();
+    return arr.find(i => i.id === imageId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+
+async function pollUntilAnomalies(opts: {
+  ownerInspectionId: number;
+  imageId: number;
+  setMeta: (m: ImageMeta | null) => void;
+  timeoutMs?: number;
+  intervalMs?: number;
+}) {
+  const { ownerInspectionId, imageId, setMeta, timeoutMs = 30000, intervalMs = 1200 } = opts;
+  const start = Date.now();
+  // simple polling loop until anomalies appear or timeout
+  // we also update meta on each tick so scores/labels/UI can refresh progressively
+  // (in case backend fills fields in stages)
+  while (Date.now() - start < timeoutMs) {
+    const meta = await fetchImageMeta(ownerInspectionId, imageId);
+    if (meta) {
+      setMeta(meta);
+      if (Array.isArray(meta.anomalies) && meta.anomalies.length > 0) return;
+    }
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+}
+
 function toNiceDateTime(d: string, t: string) {
   const dt = new Date(`${d}T${t}`);
   return dt.toLocaleString("en-US", {
@@ -87,6 +135,11 @@ function toNiceDateTime(d: string, t: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function clampThreshold(value: number): number {
+  if (Number.isNaN(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
 
 function pill(status: Status): React.CSSProperties {
@@ -115,6 +168,24 @@ function Chip({ title, value }: { title: string; value?: string }) {
   );
 }
 
+type DisplayAnomaly = AnomalyMeta & { displayIndex: number };
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function toDisplayAnomalies(list?: AnomalyMeta[]): DisplayAnomaly[] {
+  if (!Array.isArray(list)) return [];
+  const sanitized: DisplayAnomaly[] = [];
+  for (const item of list) {
+    if (!item) continue;
+    if (!isFiniteNumber(item.width) || !isFiniteNumber(item.height)) continue;
+    if (item.width <= 0 || item.height <= 0) continue;
+    if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) continue;
+    sanitized.push({ ...item, displayIndex: sanitized.length + 1 });
+  }
+  return sanitized;
+}
 
 async function resolveImageUrl(ownerInspectionId: number, meta: ImageMeta, setUrl: (u: string) => void) {
   try {
@@ -148,12 +219,21 @@ export default function InspectionDetail() {
     lastUpdated: "-",
   });
 
+  const [inspection, setInspection] = useState<InspectionDTO | null>(null);
+  const [temperature, setTemperature] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
   const [baselineMeta, setBaselineMeta] = useState<ImageMeta | null>(null);
   const [baselineUrl, setBaselineUrl] = useState<string | null>(null);
   const [baselineOwnerInspectionId, setBaselineOwnerInspectionId] = useState<number | null>(null);
 
   const [maintMeta, setMaintMeta] = useState<ImageMeta | null>(null);
   const [maintUrl, setMaintUrl] = useState<string | null>(null);
+
+  const baselineAnomalies = useMemo(() => toDisplayAnomalies(baselineMeta?.anomalies), [baselineMeta]);
+  const maintAnomalies = useMemo(() => toDisplayAnomalies(maintMeta?.anomalies), [maintMeta]);
 
   const [condition, setCondition] = useState<Condition>("SUNNY");
 
@@ -179,21 +259,25 @@ export default function InspectionDetail() {
             status: fromState.status as Status,
             lastUpdated: fromState.inspectedDate,
           }));
-        } else {
-          const res = await fetch(api(`/inspections/${numericInspectionId}`), {
-          headers: { ...authHeaders() }, 
-        });
-          if (!res.ok) throw new Error(`Failed to load inspection ${numericInspectionId}`);
-          const dto: InspectionDTO = await res.json();
-          setHeader({
-            transformerNo: dto.transformerNo,
-            poleNo: "-",
-            branch: dto.branch,
-            inspectedBy: "-",
-            status: (dto.status as Status) || "Pending",
-            lastUpdated: toNiceDateTime(dto.inspectionDate, dto.inspectionTime),
-          });
         }
+
+        const res = await fetch(api(`/inspections/${numericInspectionId}`), {
+          headers: { ...authHeaders() },
+        });
+        if (!res.ok) throw new Error(`Failed to load inspection ${numericInspectionId}`);
+        const dto: InspectionDTO = await res.json();
+        if (cancelled) return;
+        setInspection(dto);
+        setHeader({
+          transformerNo: dto.transformerNo,
+          poleNo: "-",
+          branch: dto.branch,
+          inspectedBy: "-",
+          status: (dto.status as Status) || "Pending",
+          lastUpdated: toNiceDateTime(dto.inspectionDate, dto.inspectionTime),
+        });
+        setTemperature(typeof dto.inferenceThreshold === "number" ? clampThreshold(dto.inferenceThreshold) : null);
+
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? "Failed to load inspection");
       }
@@ -301,44 +385,140 @@ export default function InspectionDetail() {
     else alert("Delete failed");
   }
 
+  // NEW: list all inspections for this transformer
+  async function getInspectionIdsForTransformer(transformerNo?: string): Promise<number[]> {
+    if (!transformerNo) return [];
+    try {
+      const res = await fetch(api(`/inspections/by-no?no=${encodeURIComponent(transformerNo)}`), {
+        headers: { ...authHeaders() },
+      });
+      if (!res.ok) return [];
+      const list: InspectionDTO[] = await res.json();
+      // sort newest first just in case (not strictly required)
+      list.sort((a, b) => {
+        const at = new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() || new Date(a.createdAt).getTime();
+        const bt = new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() || new Date(b.createdAt).getTime();
+        return bt - at;
+      });
+      return list.map(x => x.inspectionNo);
+    } catch {
+      return [];
+    }
+  }
+
+  // NEW: post the file to a specific inspection (no progress UI; used for “other” inspections)
+  async function uploadImageToInspection(opts: {
+    inspectionId: number;
+    type: ImageType;
+    file: File | Blob;
+    condition: Condition;
+    uploader?: string;
+  }) {
+    const { inspectionId, type, file, condition, uploader = "web" } = opts;
+    const url = new URL(api(`/inspections/${inspectionId}/images`));
+    url.searchParams.set("type", type);
+    url.searchParams.set("uploader", uploader);
+    url.searchParams.set("condition", condition);
+
+    const fd = new FormData();
+    // IMPORTANT: if `file` is a Blob copy, give it a filename so backend saves correctly.
+    const named = file instanceof File ? file : new File([file], `baseline${inspectionId}.jpg`, { type: "image/jpeg" });
+    fd.append("files", named);
+
+    await fetch(url.toString(), {
+      method: "POST",
+      headers: { ...authHeaders() }, // X-User-Id
+      body: fd,
+    }).catch(() => { /* swallow – we don’t want to break the primary upload UX */ });
+  }
+
+  // CHANGED: startUpload — baseline path uploads to ALL inspections for the transformer
   function startUpload(t: ImageType, file: File) {
     setUploadPct(0);
     setShowUpload(true);
-    const url = new URL(api(`/inspections/${numericInspectionId}/images`));
-    url.searchParams.set("type", t);
-    url.searchParams.set("uploader", "web");
-    url.searchParams.set("condition", condition);
+
+    // We keep your existing XHR progress UX for the "primary" upload (current inspection).
+    const primaryUrl = new URL(api(`/inspections/${numericInspectionId}/images`));
+    primaryUrl.searchParams.set("type", t);
+    primaryUrl.searchParams.set("uploader", "web");
+    primaryUrl.searchParams.set("condition", condition);
+
     const fd = new FormData();
     fd.append("files", file);
+
     const xhr = new XMLHttpRequest();
     activeXhr.current = xhr;
+
     xhr.upload.onprogress = (evt) => {
       if (!evt.lengthComputable) return;
       const pct = Math.round((evt.loaded / evt.total) * 100);
       setUploadPct(pct);
     };
-    xhr.onreadystatechange = () => {
+
+    xhr.onreadystatechange = async () => {
       if (xhr.readyState !== 4) return;
+
+      // We’ll finish the UI state at the end no matter what
+      const finish = () => {
+        setShowUpload(false);
+        activeXhr.current = null;
+      };
+
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const list: ImageMeta[] = JSON.parse(xhr.responseText);
           const latest = list?.[0];
+
           if (t === "BASELINE") {
+            // Update local UI for baseline pointing at *this* inspection (as before)
             setBaselineMeta(latest || null);
             setBaselineOwnerInspectionId(numericInspectionId);
             if (latest) resolveImageUrl(numericInspectionId, latest, (u) => setBaselineUrl(u));
+
+            // NEW: fan-out upload to all other inspections for the same transformer
+            // Reuse the same bytes: clone the file into a Blob so we can send it again.
+            const blob = file.slice(0, file.size, file.type);
+            const allIds = await getInspectionIdsForTransformer(header.transformerNo);
+            const others = allIds.filter(id => id !== numericInspectionId);
+
+            // fire in parallel but don’t block UI — we still complete the modal below
+            // (No progress aggregation here to keep the UI simple.)
+            Promise.all(
+              others.map(id =>
+                uploadImageToInspection({
+                  inspectionId: id,
+                  type: "BASELINE",
+                  file: blob,
+                  condition,
+                  uploader: "web",
+                })
+              )
+            ).catch(() => { /* ignore per-inspection failures here; user already got success for the current one */ });
+
           } else {
+            // MAINTENANCE flow stays the same
             setMaintMeta(latest || null);
-            if (latest) resolveImageUrl(numericInspectionId, latest, (u) => setMaintUrl(u));
+            if (latest) {
+              resolveImageUrl(numericInspectionId, latest, (u) => setMaintUrl(u));
+              pollUntilAnomalies({
+                ownerInspectionId: numericInspectionId,
+                imageId: latest.id,
+                setMeta: (m) => setMaintMeta(m),
+              });
+
+            }
           }
-        } catch {}
+        } catch {
+          alert("Upload succeeded but response couldn’t be parsed");
+        }
+        finish();
       } else {
         alert("Upload failed");
+        finish();
       }
-      setShowUpload(false);
-      activeXhr.current = null;
     };
-    xhr.open("POST", url.toString(), true);
+
+    xhr.open("POST", primaryUrl.toString(), true);
     const u = getUser();
     if (u && typeof u.id === "number" && Number.isFinite(u.id)) {
       xhr.setRequestHeader("X-User-Id", String(u.id));
@@ -372,6 +552,92 @@ export default function InspectionDetail() {
   // shared zoom ref for maintenance image
   const zoomRef = useRef<ZoomHandle | null>(null);
   const hasMaint = Boolean(maintUrl);
+  const hasAnyAnomalies = baselineAnomalies.length > 0 || maintAnomalies.length > 0;
+
+
+  const numericThreshold = (() => {
+    if (typeof temperature === "number") return clampThreshold(temperature);
+    if (typeof inspection?.inferenceThreshold === "number") return clampThreshold(inspection.inferenceThreshold);
+    return null;
+  })();
+  const sliderValue = numericThreshold ?? 0.5;
+
+  const onSliderChange = (value: string) => {
+    const num = parseFloat(value);
+    if (Number.isNaN(num)) {
+      setTemperature(null);
+      return;
+    }
+    setTemperature(clampThreshold(num));
+  };
+
+  const onNumberChange = (value: string) => {
+    if (value.trim() === "") {
+      setTemperature(null);
+      return;
+    }
+    const num = Number(value);
+    if (Number.isNaN(num)) return;
+    setTemperature(clampThreshold(num));
+  };
+
+  const onNumberBlur = () => {
+    if (typeof temperature === "number") {
+      setTemperature(clampThreshold(temperature));
+    }
+  };
+
+  const saveThreshold = useCallback(async () => {
+    if (!inspection) {
+      setSaveError("Inspection data not loaded yet");
+      return;
+    }
+    try {
+      setSaveError(null);
+      setSaveSuccess(null);
+      setSaving(true);
+      const nextThreshold =
+        typeof temperature === "number"
+          ? clampThreshold(temperature)
+          : (typeof inspection.inferenceThreshold === "number"
+              ? clampThreshold(inspection.inferenceThreshold)
+              : undefined);
+      const payload: InspectionDTO = {
+        ...inspection,
+        inferenceThreshold: nextThreshold,
+      };
+
+      const res = await fetch(api(`/inspections/${numericInspectionId}`), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Failed to save inspection ${numericInspectionId}`);
+      const updated: InspectionDTO = await res.json();
+      setInspection(updated);
+      setTemperature(
+        typeof updated.inferenceThreshold === "number"
+          ? clampThreshold(updated.inferenceThreshold)
+          : null
+      );
+      setHeader({
+        transformerNo: updated.transformerNo,
+        poleNo: "-",
+        branch: updated.branch,
+        inspectedBy: "-",
+        status: (updated.status as Status) || "Pending",
+        lastUpdated: toNiceDateTime(updated.inspectionDate, updated.inspectionTime),
+      });
+      setSaveSuccess("Inference threshold saved successfully.");
+    } catch (e: any) {
+      setSaveError(e?.message ?? "Failed to save changes");
+    } finally {
+      setSaving(false);
+    }
+  }, [inspection, numericInspectionId, temperature]);
 
   /* ----- Render ----- */
   return (
@@ -555,6 +821,68 @@ export default function InspectionDetail() {
             </select>
           </div>
 
+          <div style={{ marginTop: 16 }}>
+            <label style={{ display: "block", fontWeight: 800, color: ui.sub, marginBottom: 6 }}>
+              Inference Threshold
+            </label>
+            <p style={{ margin: 0, color: ui.sub, fontSize: 12, fontWeight: 600 }}>
+              Adjust the threshold (0-1) used when running thermal inference.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={sliderValue}
+                onChange={(e) => onSliderChange(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={numericThreshold ?? ""}
+                onChange={(e) => onNumberChange(e.target.value)}
+                onBlur={onNumberBlur}
+                style={{
+                  width: 72,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: `1px solid ${ui.border}`,
+                  fontWeight: 700,
+                  textAlign: "center",
+                }}
+              />
+            </div>
+            <button
+              onClick={saveThreshold}
+              disabled={saving || !inspection}
+              style={{
+                marginTop: 12,
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: 0,
+                fontWeight: 800,
+                cursor: saving || !inspection ? "not-allowed" : "pointer",
+                background: saving ? "#c7d2fe" : ui.primary,
+                color: "#fff",
+                boxShadow: "0 6px 16px rgba(63,81,181,.25)",
+                transition: "background .2s ease",
+              }}
+            >
+              {saving ? "Saving..." : "Save inference threshold"}
+            </button>
+            {saveError && (
+              <div style={{ color: ui.danger, fontWeight: 700, marginTop: 8 }}>{saveError}</div>
+            )}
+            {saveSuccess && !saveError && (
+              <div style={{ color: ui.ok, fontWeight: 700, marginTop: 8 }}>{saveSuccess}</div>
+            )}
+          </div>
+
           <input
             ref={maintInputRef}
             type="file"
@@ -605,27 +933,43 @@ export default function InspectionDetail() {
                 }}
               >
                 <Figure title="Baseline" date={baselineMeta?.uploadedAt}>
-                  {baselineUrl ? (
-                    <img
-                      src={baselineUrl}
-                      alt="Baseline"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        borderRadius: 12,
-                        flex: 1,
-                      }}
-                    />
-                  ) : (
-                    <EmptySlot text="No baseline image" />
-                  )}
+                  <ZoomableImage
+                    src={baselineUrl}
+                    alt="Baseline"
+                    emptyText="No baseline image"
+                    interactive={false}
+                    anomalies={baselineAnomalies}
+                  />
                 </Figure>
 
                 <Figure title="Current" date={maintMeta?.uploadedAt}>
-                  <ZoomableImage ref={zoomRef} src={maintUrl} alt="Current" emptyText="No maintenance image" />
+                  <ZoomableImage
+                    ref={zoomRef}
+                    src={maintUrl}
+                    alt="Current"
+                    emptyText="No maintenance image"
+                    anomalies={maintAnomalies}
+                  />
                 </Figure>
               </div>
+
+              {hasAnyAnomalies && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: 12,
+                    marginTop: 12,
+                  }}
+                >
+                  {baselineAnomalies.length > 0 && (
+                    <AnomalyLegend title="Baseline anomalies" items={baselineAnomalies} />
+                  )}
+                  {maintAnomalies.length > 0 && (
+                    <AnomalyLegend title="Current anomalies" items={maintAnomalies} />
+                  )}
+                </div>
+              )}
 
               {/* Shared zoom control bar below the two images */}
               <div
@@ -798,53 +1142,152 @@ type ZoomableImageProps = {
   src?: string | null;
   alt: string;
   emptyText: string;
-  overlays?: React.ReactNode;
-  onResetOverlays?: () => void;
+  anomalies?: DisplayAnomaly[];
+  interactive?: boolean;
+};
+
+type RenderAnomalyBox = {
+  key: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  displayIndex: number;
 };
 
 const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function ZoomableImage(
-  { src, alt, emptyText, overlays, onResetOverlays }: ZoomableImageProps,
+  { src, alt, emptyText,  anomalies, interactive = true }: ZoomableImageProps,
   ref
 ) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [showHint, setShowHint] = useState(true);
+  const [showHint, setShowHint] = useState(interactive);
   const dragOrigin = useRef<{ pointerId: number; x: number; y: number; baseX: number; baseY: number } | null>(
     null,
   );
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [renderBoxes, setRenderBoxes] = useState<RenderAnomalyBox[]>([]);
+  const isInteractive = interactive !== false;
   const hasImage = Boolean(src);
 
   useEffect(() => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
-    setShowHint(true);
-  }, [src]);
+    setShowHint(isInteractive);
+  }, [src, isInteractive]);
+
+  const computeBoxes = useCallback(() => {
+    if (!anomalies?.length || !containerRef.current || !imageRef.current) {
+      setRenderBoxes([]);
+      return;
+    }
+
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    if (!naturalWidth || !naturalHeight) {
+      setRenderBoxes([]);
+      return;
+    }
+
+    const containerWidth = containerRef.current.offsetWidth;
+    const containerHeight = containerRef.current.offsetHeight;
+    if (!containerWidth || !containerHeight) {
+      setRenderBoxes([]);
+      return;
+    }
+
+    const imageAspect = naturalWidth / naturalHeight;
+    const containerAspect = containerWidth / containerHeight;
+    let displayWidth = containerWidth;
+    let displayHeight = containerHeight;
+    if (imageAspect > containerAspect) {
+      displayHeight = displayWidth / imageAspect;
+    } else {
+      displayWidth = displayHeight * imageAspect;
+    }
+
+    const offsetX = (containerWidth - displayWidth) / 2;
+    const offsetY = (containerHeight - displayHeight) / 2;
+    const scaleX = displayWidth / naturalWidth;
+    const scaleY = displayHeight / naturalHeight;
+
+    const mapped: RenderAnomalyBox[] = anomalies
+      .map((anomaly, idx) => {
+        if (!isFiniteNumber(anomaly.x) || !isFiniteNumber(anomaly.y)) return null;
+        if (!isFiniteNumber(anomaly.width) || !isFiniteNumber(anomaly.height)) return null;
+        const left = offsetX + anomaly.x * scaleX;
+        const top = offsetY + anomaly.y * scaleY;
+        const width = anomaly.width * scaleX;
+        const height = anomaly.height * scaleY;
+        if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(width) || !Number.isFinite(height))
+          return null;
+        if (width <= 0 || height <= 0) return null;
+        const boundedLeft = Math.max(0, Math.min(left, containerWidth));
+        const boundedTop = Math.max(0, Math.min(top, containerHeight));
+        const boundedWidth = Math.min(width, containerWidth - boundedLeft);
+        const boundedHeight = Math.min(height, containerHeight - boundedTop);
+        if (boundedWidth <= 0 || boundedHeight <= 0) return null;
+        const displayIndex = anomaly.displayIndex ?? idx + 1;
+        return {
+          key: `${displayIndex}-${anomaly.id ?? idx}`,
+          left: boundedLeft,
+          top: boundedTop,
+          width: boundedWidth,
+          height: boundedHeight,
+          displayIndex,
+        } satisfies RenderAnomalyBox;
+      })
+      .filter((box): box is RenderAnomalyBox => Boolean(box));
+
+    setRenderBoxes(mapped);
+  }, [anomalies]);
+
+  useEffect(() => {
+    if (!hasImage) {
+      setRenderBoxes([]);
+      return;
+    }
+    computeBoxes();
+  }, [hasImage, computeBoxes]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const node = containerRef.current;
+    const observer = new ResizeObserver(() => computeBoxes());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [computeBoxes]);
+
+  const handleImageLoad = useCallback(() => {
+    computeBoxes();
+  }, [computeBoxes]);
 
   const zoomIn = useCallback(() => {
-    if (!hasImage) return;
+    if (!hasImage || !isInteractive) return;
     setScale((prev) => Math.min(prev + 0.25, 4));
-  }, [hasImage]);
+  }, [hasImage, isInteractive]);
 
   const zoomOut = useCallback(() => {
-    if (!hasImage) return;
+    if (!hasImage || !isInteractive) return;
     setScale((prev) => Math.max(prev - 0.25, 0.5));
-  }, [hasImage]);
+  }, [!hasImage || !isInteractive]);
 
   const resetView = useCallback(() => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
-    setShowHint(true);
+    setShowHint(isInteractive);
     dragOrigin.current = null;
-    onResetOverlays?.();
-  }, [onResetOverlays]);
+    computeBoxes();
+  }, [computeBoxes, isInteractive]);
 
   // expose controls to parent
   useImperativeHandle(ref, () => ({ zoomIn, zoomOut, resetView }), [zoomIn, zoomOut, resetView]);
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!hasImage) return;
+      if (!hasImage || !isInteractive) return;
       event.preventDefault();
       const { pointerId, clientX, clientY } = event;
       dragOrigin.current = { pointerId, x: clientX, y: clientY, baseX: offset.x, baseY: offset.y };
@@ -852,18 +1295,18 @@ const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function Zoomab
       setShowHint(false);
       event.currentTarget.setPointerCapture(pointerId);
     },
-    [hasImage, offset.x, offset.y],
+    [hasImage, isInteractive, offset.x, offset.y],
   );
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!hasImage) return;
+    if (!hasImage || !isInteractive) return;
     const active = dragOrigin.current;
     if (!active) return;
     event.preventDefault();
     const dx = event.clientX - active.x;
     const dy = event.clientY - active.y;
     setOffset({ x: active.baseX + dx, y: active.baseY + dy });
-  }, [hasImage]);
+  }, [hasImage, isInteractive]);
 
   const clearPointerState = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const active = dragOrigin.current;
@@ -876,25 +1319,29 @@ const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function Zoomab
 
   const handlePointerUp = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!hasImage) {
+      if (!hasImage || !isInteractive) {
         setIsDragging(false);
         return;
       }
       clearPointerState(event);
     },
-    [clearPointerState, hasImage],
+    [clearPointerState, hasImage, isInteractive],
   );
 
   const handlePointerLeave = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!hasImage) {
+      if (!hasImage || !isInteractive) {
         setIsDragging(false);
         return;
       }
       clearPointerState(event);
     },
-    [clearPointerState, hasImage],
+    [clearPointerState, hasImage, isInteractive],
   );
+
+  const handleImageError = useCallback(() => {
+    setRenderBoxes([]);
+  }, []);
 
   return (
     <div
@@ -924,8 +1371,12 @@ const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function Zoomab
           width: "100%",
           borderRadius: 12,
           overflow: "hidden",
-          cursor: hasImage ? (isDragging ? "grabbing" : "grab") : "default",
-          touchAction: "none",
+          cursor: !isInteractive
+            ? "default"
+            : hasImage
+              ? (isDragging ? "grabbing" : "grab")
+              : "default",
+          touchAction: isInteractive ? "none" : "auto",
           background: hasImage ? "#0b1a4a" : "rgba(15,23,42,0.25)",
           display: "flex",
           alignItems: "stretch",
@@ -934,6 +1385,7 @@ const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function Zoomab
         {hasImage ? (
           <>
             <div
+              ref={containerRef}
               style={{
                 position: "absolute",
                 inset: 0,
@@ -950,7 +1402,10 @@ const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function Zoomab
                 <img
                   src={src ?? undefined}
                   alt={alt}
+                  ref={imageRef}
                   draggable={false}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
                   style={{
                     display: "block",
                     width: "100%",
@@ -960,12 +1415,47 @@ const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function Zoomab
                     pointerEvents: "none",
                   }}
                 />
-                {overlays && (
-                  <div style={{ position: "absolute", inset: 0 }}>{overlays}</div>
+                {renderBoxes.length > 0 && (
+                  <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                    {renderBoxes.map((box) => (
+                      <div
+                        key={box.key}
+                        style={{
+                          position: "absolute",
+                          left: box.left,
+                          top: box.top,
+                          width: box.width,
+                          height: box.height,
+                          border: "2px solid rgba(251,191,36,0.95)",
+                          borderRadius: 12,
+                          background: "rgba(251,191,36,0.12)",
+                          boxShadow: "0 8px 18px rgba(251,191,36,0.25)",
+                          color: "#facc15",
+                          fontWeight: 800,
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            left: 8,
+                            background: "rgba(250,204,21,0.95)",
+                            color: "#0f172a",
+                            borderRadius: 999,
+                            padding: "2px 8px",
+                            fontSize: 12,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {box.displayIndex}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
-            {showHint && (
+            {showHint && isInteractive && (
               <div
                 style={{
                   position: "absolute",
@@ -1080,19 +1570,61 @@ function Figure({
   );
 }
 
-function EmptySlot({ text }: { text: string }) {
+function AnomalyLegend({ title, items }: { title: string; items: DisplayAnomaly[] }) {
   return (
     <div
       style={{
-        width: "100%",
-        height: 320,
-        display: "grid",
-        placeItems: "center",
-        color: "#cbd5e1",
-        fontWeight: 700,
+        background: "#111827",
+        borderRadius: 12,
+        padding: "12px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
       }}
     >
-      {text}
+      <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: 13, letterSpacing: 0.4 }}>{title}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map((item) => {
+          const label = item.label?.trim() ? item.label : "Unlabeled anomaly";
+          return (
+            <div
+              key={item.displayIndex}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                color: "#f1f5f9",
+                fontWeight: 700,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    background: "rgba(250,204,21,0.2)",
+                    color: "#facc15",
+                    fontWeight: 900,
+                  }}
+                >
+                  {item.displayIndex}
+                </span>
+                <span>{label}</span>
+              </div>
+              {isFiniteNumber(item.score) && (
+                <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>
+                  Score: {Number(item.score).toFixed(2)}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
