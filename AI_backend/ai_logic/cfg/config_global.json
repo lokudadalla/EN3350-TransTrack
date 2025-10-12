@@ -18,7 +18,7 @@
     "dv_min_hot": 0.18
   },
   "decision": {
-  "rule_prob_thr": 0.4,
+  "rule_prob_thr": 0.2,
   "use_rule_only_fallback": true
   }
 }
