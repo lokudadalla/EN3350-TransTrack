@@ -28,9 +28,6 @@ public class InferenceServiceImp implements InferenceService {
     @Value("${app.server.public-base:http://localhost:8080}")
     private String publicBase;
 
-    private String fileUrl(Long inspectionId, Long imageId) {
-        return "%s/inspections/%d/images/%d/file".formatted(publicBase, inspectionId, imageId);
-    }
 
     @Override
     @Transactional
@@ -57,7 +54,6 @@ public class InferenceServiceImp implements InferenceService {
         if (threshold == null) {
             throw new IllegalStateException("inferenceThreshold not set for inspection " + inspectionId);
         }
-        int tempPercent = (int) Math.round(threshold * 100.0);
 
         // 4) Build URL-mode request that matches FastAPI
         String maintenancePath = maint.getStoragePath();

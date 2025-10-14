@@ -157,6 +157,7 @@ async def infer(req: InferenceRequest):
             cfg_overrides=final_overrides,
             temperature_percent=req.temperature_percent,
         )
+        print(result)
         return result
 
     except HTTPException:
