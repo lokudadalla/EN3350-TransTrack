@@ -3,8 +3,8 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getUser } from "../auth"; // adjust path if needed
 import type { ZoomHandle } from "../types/models";
 import { ZoomableImage } from "../components/ZoomableImage";
-import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition } from "../types/models";
-import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly } from "../api/Inspections";
+import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition, AnomalyMeta } from "../types/models";
+import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly, createImageAnomaly } from "../api/Inspections";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
 
@@ -55,6 +55,11 @@ export default function InspectionDetail() {
 
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
+
+  const [addMode, setAddMode] = useState(false);
+  const [draftNew, setDraftNew] = useState<AnomalyMeta | null>(null);
+  const [creatingBusy, setCreatingBusy] = useState(false);
+
 
   async function saveEditsForIndex(idx: number) {
     if (!maintMeta?.id) return;
@@ -775,10 +780,14 @@ export default function InspectionDetail() {
                     emptyText="No maintenance image"
                     anomalies={maintAnomalies}
                     editable
+                    createMode={addMode}
+                    onCreatePreview={(box) => setDraftNew(box)}
+                    onCreateComplete={(box) => setDraftNew(box)}
                     onChangeAnomalies={(next) => {
                       setMaintMeta((m) => (m ? { ...m, anomalies: next } : m));
                     }}
                   />
+
                 </Figure>
               </div>
 
@@ -885,6 +894,74 @@ export default function InspectionDetail() {
                   >
                     Zoom In
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddMode((v) => {
+                        const nv = !v;
+                        if (!nv) setDraftNew(null);
+                        return nv;
+                      });
+                    }}
+                    disabled={!hasMaint || creatingBusy}
+                    style={zoomBtnStyle(!hasMaint || creatingBusy)}
+                  >
+                    {addMode ? "Cancel Add" : "Add bbox"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!maintMeta?.id || !draftNew) return;
+                      try {
+                        setCreatingBusy(true);
+                        setSaveError(null); setSaveSuccess(null);
+
+                        // Prefer POST one; if it fails (501/404), fall back to PUT array
+                        let updated: ImageMeta | null = null;
+                        try {
+                          updated = await createImageAnomaly({
+                            ownerInspectionId: numericInspectionId,
+                            imageId: maintMeta.id,
+                            anomaly: draftNew,
+                          });
+                        } catch {
+                          const next = [...(maintMeta.anomalies ?? []), draftNew].map(a => ({
+                            id: a.id, x: a.x, y: a.y, width: a.width, height: a.height,
+                            label: a.label, score: a.score, size: a.size,
+                          }));
+                          updated = await saveImageAnomalies({
+                            ownerInspectionId: numericInspectionId,
+                            imageId: maintMeta.id,
+                            anomalies: next,
+                          });
+                        }
+
+                        if (updated) setMaintMeta(updated);
+                        else {
+                          // optimistic: attach new anomaly locally with displayIndex
+                          setMaintMeta(m => {
+                            if (!m) return m;
+                            const next = [...(m.anomalies ?? []), { ...draftNew, displayIndex: (m.anomalies?.length ?? 0) + 1 }];
+                            return { ...m, anomalies: next };
+                          });
+                        }
+
+                        setSaveSuccess("New anomaly saved.");
+                        setDraftNew(null);
+                        setAddMode(false);
+                      } catch (e:any) {
+                        setSaveError(e?.message ?? "Failed to create anomaly");
+                      } finally {
+                        setCreatingBusy(false);
+                      }
+                    }}
+                    disabled={!hasMaint || !addMode || !draftNew || creatingBusy}
+                    style={zoomBtnStyle(!hasMaint || !addMode || !draftNew || creatingBusy)}
+                  >
+                    Save
+                  </button>
+
                 </div>
               </div>
             </>

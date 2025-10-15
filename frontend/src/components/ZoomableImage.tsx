@@ -7,7 +7,7 @@ export function isFiniteNumber(value: unknown): value is number {
 }
 
 export const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function ZoomableImage(
-  { src, alt, emptyText,  anomalies, interactive = true , editable = false,  onChangeAnomalies,}: ZoomableImageProps,
+  { src, alt, emptyText,  anomalies, interactive = true , editable = false,  onChangeAnomalies, createMode = false, onCreatePreview, onCreateComplete}: ZoomableImageProps,
   ref
 ) {
   const [scale, setScale] = useState(1);
@@ -23,6 +23,12 @@ export const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function
   const isInteractive = interactive !== false;
   const hasImage = Boolean(src);
   const [editableAnoms, setEditableAnoms] = useState<DisplayAnomaly[]>(() => anomalies ?? []);
+  const [creating, setCreating] = useState<null | {
+      startNat: { x: number; y: number };
+      currNat:  { x: number; y: number };
+    }>(null);
+
+
   useEffect(() => { setEditableAnoms(anomalies ?? []); }, [anomalies]);
 
   // store natural/display mapping numbers from computeBoxes
@@ -46,71 +52,6 @@ export const ZoomableImage = forwardRef<ZoomHandle, ZoomableImageProps>(function
     setShowHint(isInteractive);
   }, [src, isInteractive]);
 
-  // const computeBoxes = useCallback(() => {
-  //   if (!anomalies?.length || !containerRef.current || !imageRef.current) {
-  //     setRenderBoxes([]);
-  //     return;
-  //   }
-
-  //   const naturalWidth = imageRef.current.naturalWidth;
-  //   const naturalHeight = imageRef.current.naturalHeight;
-  //   if (!naturalWidth || !naturalHeight) {
-  //     setRenderBoxes([]);
-  //     return;
-  //   }
-
-  //   const containerWidth = containerRef.current.offsetWidth;
-  //   const containerHeight = containerRef.current.offsetHeight;
-  //   if (!containerWidth || !containerHeight) {
-  //     setRenderBoxes([]);
-  //     return;
-  //   }
-
-  //   const imageAspect = naturalWidth / naturalHeight;
-  //   const containerAspect = containerWidth / containerHeight;
-  //   let displayWidth = containerWidth;
-  //   let displayHeight = containerHeight;
-  //   if (imageAspect > containerAspect) {
-  //     displayHeight = displayWidth / imageAspect;
-  //   } else {
-  //     displayWidth = displayHeight * imageAspect;
-  //   }
-
-  //   const offsetX = (containerWidth - displayWidth) / 2;
-  //   const offsetY = (containerHeight - displayHeight) / 2;
-  //   const scaleX = displayWidth / naturalWidth;
-  //   const scaleY = displayHeight / naturalHeight;
-
-  //   const mapped: RenderAnomalyBox[] = anomalies
-  //     .map((anomaly, idx) => {
-  //       if (!isFiniteNumber(anomaly.x) || !isFiniteNumber(anomaly.y)) return null;
-  //       if (!isFiniteNumber(anomaly.width) || !isFiniteNumber(anomaly.height)) return null;
-  //       const left = offsetX + anomaly.x * scaleX;
-  //       const top = offsetY + anomaly.y * scaleY;
-  //       const width = anomaly.width * scaleX;
-  //       const height = anomaly.height * scaleY;
-  //       if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(width) || !Number.isFinite(height))
-  //         return null;
-  //       if (width <= 0 || height <= 0) return null;
-  //       const boundedLeft = Math.max(0, Math.min(left, containerWidth));
-  //       const boundedTop = Math.max(0, Math.min(top, containerHeight));
-  //       const boundedWidth = Math.min(width, containerWidth - boundedLeft);
-  //       const boundedHeight = Math.min(height, containerHeight - boundedTop);
-  //       if (boundedWidth <= 0 || boundedHeight <= 0) return null;
-  //       const displayIndex = anomaly.displayIndex ?? idx + 1;
-  //       return {
-  //         key: `${displayIndex}-${anomaly.id ?? idx}`,
-  //         left: boundedLeft,
-  //         top: boundedTop,
-  //         width: boundedWidth,
-  //         height: boundedHeight,
-  //         displayIndex,
-  //       } satisfies RenderAnomalyBox;
-  //     })
-  //     .filter((box): box is RenderAnomalyBox => Boolean(box));
-
-  //   setRenderBoxes(mapped);
-  // }, [anomalies]);
 
   type Corner = "nw" | "ne" | "sw" | "se";
 
@@ -174,7 +115,8 @@ const finishResize = useCallback(() => {
 
   const computeBoxes = useCallback(() => {
   const list = (editable ? editableAnoms : anomalies) ?? [];
-  if (!list.length || !containerRef.current || !imageRef.current) {
+  // --- early element guards only ---
+  if (!containerRef.current || !imageRef.current) {
     setRenderBoxes([]);
     mappingRef.current = null;
     return;
@@ -182,12 +124,21 @@ const finishResize = useCallback(() => {
 
   const naturalWidth = imageRef.current.naturalWidth;
   const naturalHeight = imageRef.current.naturalHeight;
-  if (!naturalWidth || !naturalHeight) { setRenderBoxes([]); mappingRef.current = null; return; }
+  if (!naturalWidth || !naturalHeight) {
+    setRenderBoxes([]);
+    mappingRef.current = null;
+    return;
+  }
 
   const containerWidth = containerRef.current.offsetWidth;
   const containerHeight = containerRef.current.offsetHeight;
-  if (!containerWidth || !containerHeight) { setRenderBoxes([]); mappingRef.current = null; return; }
+  if (!containerWidth || !containerHeight) {
+    setRenderBoxes([]);
+    mappingRef.current = null;
+    return;
+  }
 
+  // --- compute mapping ALWAYS ---
   const imageAspect = naturalWidth / naturalHeight;
   const containerAspect = containerWidth / containerHeight;
   let displayWidth = containerWidth;
@@ -209,6 +160,47 @@ const finishResize = useCallback(() => {
     containerWidth, containerHeight,
     offsetX, offsetY, scaleX, scaleY,
   };
+
+  // --- render boxes only if any ---
+  if (!list.length) {
+    setRenderBoxes([]);
+    return;
+  }
+  // if (!list.length || !containerRef.current || !imageRef.current) {
+  //   setRenderBoxes([]);
+  //   mappingRef.current = null;
+  //   return;
+  // }
+
+  // const naturalWidth = imageRef.current.naturalWidth;
+  // const naturalHeight = imageRef.current.naturalHeight;
+  // if (!naturalWidth || !naturalHeight) { setRenderBoxes([]); mappingRef.current = null; return; }
+
+  // const containerWidth = containerRef.current.offsetWidth;
+  // const containerHeight = containerRef.current.offsetHeight;
+  // if (!containerWidth || !containerHeight) { setRenderBoxes([]); mappingRef.current = null; return; }
+
+  // const imageAspect = naturalWidth / naturalHeight;
+  // const containerAspect = containerWidth / containerHeight;
+  // let displayWidth = containerWidth;
+  // let displayHeight = containerHeight;
+  // if (imageAspect > containerAspect) {
+  //   displayHeight = displayWidth / imageAspect;
+  // } else {
+  //   displayWidth = displayHeight * imageAspect;
+  // }
+
+  // const offsetX = (containerWidth - displayWidth) / 2;
+  // const offsetY = (containerHeight - displayHeight) / 2;
+  // const scaleX = displayWidth / naturalWidth;
+  // const scaleY = displayHeight / naturalHeight;
+
+  // mappingRef.current = {
+  //   naturalWidth, naturalHeight,
+  //   displayWidth, displayHeight,
+  //   containerWidth, containerHeight,
+  //   offsetX, offsetY, scaleX, scaleY,
+  // };
 
   const mapped: RenderAnomalyBox[] = list
     .map((anomaly, idx) => {
@@ -270,9 +262,10 @@ const finishResize = useCallback(() => {
   }, [hasImage, isInteractive]);
 
   const zoomOut = useCallback(() => {
-    if (!hasImage || !isInteractive) return;
-    setScale((prev) => Math.max(prev - 0.25, 0.5));
-  }, [!hasImage || !isInteractive]);
+  if (!hasImage || !isInteractive) return;
+  setScale((prev) => Math.max(prev - 0.25, 0.5));
+}, [hasImage, isInteractive]); // ← fix deps
+
 
   const resetView = useCallback(() => {
     setScale(1);
@@ -287,6 +280,32 @@ const finishResize = useCallback(() => {
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      if (hasImage && isInteractive && editable && createMode && mappingRef.current) {
+          event.preventDefault();
+
+          // capture so we keep receiving pointermove even if it leaves
+          (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+
+          const rect = containerRef.current!.getBoundingClientRect();
+// rect already reflects translate+scale, so DO NOT subtract offset
+const cx = (event.clientX - rect.left) / scale;
+const cy = (event.clientY - rect.top ) / scale;
+
+          const map = mappingRef.current;
+          const nx = (cx - map.offsetX) / map.scaleX;
+          const ny = (cy - map.offsetY) / map.scaleY;
+
+          const startNat = {
+            x: Math.min(Math.max(0, nx), map.naturalWidth),
+            y: Math.min(Math.max(0, ny), map.naturalHeight),
+          };
+
+          setCreating({ startNat, currNat: startNat });
+          onCreatePreview?.({ x: startNat.x, y: startNat.y, width: 1, height: 1 });
+          return; // IMPORTANT: don’t enter pan logic
+        }
+
+
       if (!hasImage || !isInteractive) return;
       event.preventDefault();
       const { pointerId, clientX, clientY } = event;
@@ -299,7 +318,36 @@ const finishResize = useCallback(() => {
   );
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-  if (!hasImage || !isInteractive) return;
+    if (!hasImage || !isInteractive) return;
+
+  // --- CREATE MODE ---
+  if (creating && mappingRef.current) {
+    event.preventDefault();
+
+    const rect = containerRef.current!.getBoundingClientRect();
+// rect already reflects translate+scale, so DO NOT subtract offset
+const cx = (event.clientX - rect.left) / scale;
+const cy = (event.clientY - rect.top ) / scale;
+
+    const map = mappingRef.current;
+    const nx = (cx - map.offsetX) / map.scaleX;
+    const ny = (cy - map.offsetY) / map.scaleY;
+
+    const currNat = {
+      x: Math.min(Math.max(0, nx), map.naturalWidth),
+      y: Math.min(Math.max(0, ny), map.naturalHeight),
+    };
+
+    // Use the latest 'creating' state values to compute the preview rect
+    const x = Math.min(creating.startNat.x, currNat.x);
+    const y = Math.min(creating.startNat.y, currNat.y);
+    const w = Math.abs(currNat.x - creating.startNat.x);
+    const h = Math.abs(currNat.y - creating.startNat.y);
+
+    setCreating({ startNat: creating.startNat, currNat });
+    onCreatePreview?.({ x, y, width: Math.max(1, w), height: Math.max(1, h) });
+    return;
+  }
 
   if (resizing && mappingRef.current) {
     event.preventDefault();
@@ -345,7 +393,7 @@ const finishResize = useCallback(() => {
     const dx = event.clientX - active.x;
     const dy = event.clientY - active.y;
     setOffset({ x: active.baseX + dx, y: active.baseY + dy });
-  }, [hasImage, isInteractive, resizing, scale, computeBoxes]);
+  }, [hasImage, isInteractive, creating, resizing, scale, computeBoxes]);
 
   const clearPointerState = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const active = dragOrigin.current;
@@ -356,30 +404,56 @@ const finishResize = useCallback(() => {
     setIsDragging(false);
   }, []);
 
-  const handlePointerUp = useCallback(
-  (event: React.PointerEvent<HTMLDivElement>) => {
-    if (resizing) {
-      (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
-      setResizing(null);
-      finishResize();          // <- notify parent
-      return;
-    }
-    clearPointerState(event);
-  },
-  [resizing, clearPointerState, finishResize]
-);
+  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+  // CREATE complete
+  if (creating && mappingRef.current) {
+    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+    const { startNat, currNat } = creating;
+    const x = Math.min(startNat.x, currNat.x);
+    const y = Math.min(startNat.y, currNat.y);
+    const w = Math.max(1, Math.abs(currNat.x - startNat.x));
+    const h = Math.max(1, Math.abs(currNat.y - startNat.y));
+    onCreateComplete?.({ x, y, width: w, height: h });
+    setCreating(null);
+    // onCreatePreview?.(null);
+    return;
+  }
 
-const handlePointerLeave = useCallback(
-  (event: React.PointerEvent<HTMLDivElement>) => {
-    if (resizing) {
-      setResizing(null);
-      finishResize();          // <- notify parent
-      return;
-    }
-    clearPointerState(event);
-  },
-  [resizing, clearPointerState, finishResize]
-);
+  // RESIZE complete (unchanged)
+  if (resizing) {
+    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+    setResizing(null);
+    finishResize();
+    return;
+  }
+
+  clearPointerState(event);
+}, [creating, resizing, onCreateComplete, onCreatePreview, finishResize, clearPointerState]);
+
+const handlePointerLeave = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+  if (creating && mappingRef.current) {
+    const { startNat, currNat } = creating;
+    const x = Math.min(startNat.x, currNat.x);
+    const y = Math.min(startNat.y, currNat.y);
+    const w = Math.max(1, Math.abs(currNat.x - startNat.x));
+    const h = Math.max(1, Math.abs(currNat.y - startNat.y));
+    onCreateComplete?.({ x, y, width: w, height: h });
+    setCreating(null);
+    // onCreatePreview?.(null);
+    return;
+  }
+
+  if (resizing) {
+    setResizing(null);
+    finishResize();
+    return;
+  }
+
+  clearPointerState(event);
+}, [creating, resizing, onCreateComplete, onCreatePreview, finishResize, clearPointerState]);
+
+
+
 
 
   const handleImageError = useCallback(() => {
@@ -459,12 +533,13 @@ const handlePointerLeave = useCallback(
                   }}
                 />
                   {renderBoxes.length > 0 && (
+                    
                     <div
                       style={{
                         position: "absolute",
                         inset: 0,
                         // Let handles receive events; keep boxes themselves click-through if you still want panning.
-                        pointerEvents: editable ? "auto" : "none",
+                        pointerEvents: createMode ? "none" : (editable ? "auto" : "none"),
                       }}
                     >
                       {renderBoxes.map((box, idx) => (
@@ -532,6 +607,34 @@ const handlePointerLeave = useCallback(
                       ))}
                     </div>
                   )}
+
+                  {/* Draft overlay while creating */}
+                  {creating && mappingRef.current && (
+                    (() => {
+                      const map = mappingRef.current;
+                      const x = Math.min(creating.startNat.x, creating.currNat.x);
+                      const y = Math.min(creating.startNat.y, creating.currNat.y);
+                      const w = Math.abs(creating.currNat.x - creating.startNat.x);
+                      const h = Math.abs(creating.currNat.y - creating.startNat.y);
+                      const left = map.offsetX + x * map.scaleX;
+                      const top  = map.offsetY + y * map.scaleY;
+                      const width  = Math.max(1, w * map.scaleX);
+                      const height = Math.max(1, h * map.scaleY);
+                      return (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left, top, width, height,
+                            border: "2px dashed rgba(224, 241, 99, 0.95)",
+                            background: "rgba(211, 211, 235, 0.18)",
+                            borderRadius: 10,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      );
+                    })()
+                  )}
+
 
 
                   </div>

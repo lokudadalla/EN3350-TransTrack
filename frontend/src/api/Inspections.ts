@@ -228,3 +228,24 @@ export async function deleteImageAnomaly(
     return await saveImageAnomalies({ ownerInspectionId, imageId, anomalies: nextAnomalies });
   }
 }
+
+
+// POST one anomaly (if your backend supports it); else we'll fall back to PUT-all
+export async function createImageAnomaly(args: {
+  ownerInspectionId: number;
+  imageId: number;
+  anomaly: AnomalyMeta;
+}) {
+  const { ownerInspectionId, imageId, anomaly } = args;
+  console.log(`Creating anomaly:${JSON.stringify(anomaly)} for imageId:${imageId} and ownerInspectionId:${ownerInspectionId}`);
+  const res = await fetch(
+    api(`/inspections/${ownerInspectionId}/images/${imageId}/anomalies`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(anomaly),
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to create anomaly (${res.status})`);
+  try { return (await res.json()) as ImageMeta; } catch { return null as unknown as ImageMeta; }
+}

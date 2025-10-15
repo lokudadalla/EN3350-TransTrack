@@ -76,6 +76,13 @@ export type ZoomableImageProps = {
   editable?: boolean;
   /** NEW: called when a resize finishes (pointer up) or during live-resize if you prefer */
   onChangeAnomalies?: (next: DisplayAnomaly[]) => void;
+
+  /** NEW: when true, user draws a new bbox by drag (disables panning while active) */
+  createMode?: boolean;
+  /** NEW: live preview of the creating box (NATURAL coords); null to clear */
+  onCreatePreview?: (box: AnomalyMeta | null) => void;
+  /** NEW: fired when the user releases the mouse to finish drawing (NATURAL coords) */
+  onCreateComplete?: (box: AnomalyMeta) => void;
 };
 
 
