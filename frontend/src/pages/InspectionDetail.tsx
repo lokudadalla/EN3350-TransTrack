@@ -4,7 +4,7 @@ import { getUser } from "../auth"; // adjust path if needed
 import type { ZoomHandle, DisplayAnomaly, AnomalyMeta } from "../types/models";
 import { ZoomableImage, isFiniteNumber } from "../components/ZoomableImage";
 import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition } from "../types/models";
-import { pollUntilAnomalies, resolveImageUrl, authHeaders, api } from "../api/Inspections";
+import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection } from "../api/Inspections";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
 
@@ -26,8 +26,6 @@ const ui = {
   err: "#f43f5e",
   shadow: "0 10px 30px rgba(31,41,55,.08)",
 };
-
-
 
 
 function toNiceDateTime(d: string, t: string) {
@@ -213,19 +211,10 @@ export default function InspectionDetail() {
       return metas[0];
     }
 
-    async function maintenanceForThisInspection(): Promise<ImageMeta | null> {
-      const r = await fetch(api(`/inspections/${numericInspectionId}/images?type=MAINTENANCE`), {
-          headers: { ...authHeaders() }, 
-        });
-      if (!r.ok) return null;
-      const arr: ImageMeta[] = await r.json();
-      if (!arr?.length) return null;
-      return arr.slice().sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
-    }
 
     (async () => {
       if (!numericInspectionId) return;
-      const [globalBase, maint] = await Promise.all([latestBaselineForTransformer(), maintenanceForThisInspection()]);
+      const [globalBase, maint] = await Promise.all([latestBaselineForTransformer(), maintenanceForThisInspection(numericInspectionId)]);
       if (cancelled) return;
 
       if (globalBase) {
@@ -273,52 +262,6 @@ export default function InspectionDetail() {
     else alert("Delete failed");
   }
 
-  // NEW: list all inspections for this transformer
-  async function getInspectionIdsForTransformer(transformerNo?: string): Promise<number[]> {
-    if (!transformerNo) return [];
-    try {
-      const res = await fetch(api(`/inspections/by-no?no=${encodeURIComponent(transformerNo)}`), {
-        headers: { ...authHeaders() },
-      });
-      if (!res.ok) return [];
-      const list: InspectionDTO[] = await res.json();
-      // sort newest first just in case (not strictly required)
-      list.sort((a, b) => {
-        const at = new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() || new Date(a.createdAt).getTime();
-        const bt = new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() || new Date(b.createdAt).getTime();
-        return bt - at;
-      });
-      return list.map(x => x.inspectionNo);
-    } catch {
-      return [];
-    }
-  }
-
-  // NEW: post the file to a specific inspection (no progress UI; used for “other” inspections)
-  async function uploadImageToInspection(opts: {
-    inspectionId: number;
-    type: ImageType;
-    file: File | Blob;
-    condition: Condition;
-    uploader?: string;
-  }) {
-    const { inspectionId, type, file, condition, uploader = "web" } = opts;
-    const url = new URL(api(`/inspections/${inspectionId}/images`));
-    url.searchParams.set("type", type);
-    url.searchParams.set("uploader", uploader);
-    url.searchParams.set("condition", condition);
-
-    const fd = new FormData();
-    // IMPORTANT: if `file` is a Blob copy, give it a filename so backend saves correctly.
-    const named = file instanceof File ? file : new File([file], `baseline${inspectionId}.jpg`, { type: "image/jpeg" });
-    fd.append("files", named);
-
-    await fetch(url.toString(), {
-      method: "POST",
-      headers: { ...authHeaders() }, // X-User-Id
-      body: fd,
-    }).catch(() => { /* swallow – we don’t want to break the primary upload UX */ });
-  }
 
   // CHANGED: startUpload — baseline path uploads to ALL inspections for the transformer
   function startUpload(t: ImageType, file: File) {
