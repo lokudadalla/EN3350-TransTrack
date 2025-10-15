@@ -65,11 +65,17 @@ export type RenderAnomalyBox = {
 
 export type DisplayAnomaly = AnomalyMeta & { displayIndex: number };
 
+// types/models.ts (or wherever ZoomableImageProps lives)
 export type ZoomableImageProps = {
   src?: string | null;
-  alt: string;
+  alt?: string;
   emptyText: string;
   anomalies?: DisplayAnomaly[];
   interactive?: boolean;
+  /** NEW */
+  editable?: boolean;
+  /** NEW: called when a resize finishes (pointer up) or during live-resize if you prefer */
+  onChangeAnomalies?: (next: DisplayAnomaly[]) => void;
 };
+
 

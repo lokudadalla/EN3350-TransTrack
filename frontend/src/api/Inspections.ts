@@ -1,5 +1,5 @@
 import { getUser } from "../auth";
-import type { ImageMeta, ImageType, Condition } from "../types/models";
+import type { ImageMeta, ImageType, Condition, AnomalyMeta } from "../types/models";
 
 
 export type InspectionDTO = {
@@ -165,3 +165,66 @@ export async function resolveImageUrl(ownerInspectionId: number, meta: ImageMeta
         body: fd,
       }).catch(() => { /* swallow – we don’t want to break the primary upload UX */ });
     }
+
+
+
+
+export async function saveImageAnomalies(args: {
+  ownerInspectionId: number;
+  imageId: number;
+  anomalies: AnomalyMeta[];
+}) {
+  const { ownerInspectionId, imageId, anomalies } = args;
+  console.log(`Saving anomalies:${JSON.stringify(anomalies)} and imageId:${imageId} and ownerInspectionId:${ownerInspectionId}`);
+
+  const res = await fetch(
+    api(`/inspections/${ownerInspectionId}/images/${imageId}/anomalies`),
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(anomalies),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Failed to save anomalies (${res.status}). ${text}`);
+  }
+
+  try {
+    return (await res.json()) as ImageMeta; // if backend returns updated meta
+  } catch {
+    return null as unknown as ImageMeta;
+  }
+}
+
+
+
+/**
+ * Delete a single anomaly.
+ * - If anomalyId provided: call DELETE /.../anomalies/:anomalyId
+ * - Else: fall back to PUT the remaining anomalies array (nextAnomalies)
+ */
+export async function deleteImageAnomaly(
+  args:
+    | { ownerInspectionId: number; imageId: number; anomalyId: number }
+    | { ownerInspectionId: number; imageId: number; nextAnomalies: AnomalyMeta[] }
+) {
+  if ("anomalyId" in args) {
+    const { ownerInspectionId, imageId, anomalyId } = args;
+    console.log(`Deleting anomalyId:${anomalyId} for imageId:${imageId} and ownerInspectionId:${ownerInspectionId}`);
+    const res = await fetch(
+      api(`/inspections/${ownerInspectionId}/images/${imageId}/anomalies/${anomalyId}`),
+      { method: "DELETE", headers: { ...authHeaders() } }
+    );
+    if (!res.ok && res.status !== 204) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Failed to delete anomaly (${res.status}). ${text}`);
+    }
+    // Some backends return updated ImageMeta; try JSON, else return null.
+    try { return (await res.json()) as ImageMeta; } catch { return null as unknown as ImageMeta; }
+  } else {
+    const { ownerInspectionId, imageId, nextAnomalies } = args;
+    return await saveImageAnomalies({ ownerInspectionId, imageId, anomalies: nextAnomalies });
+  }
+}

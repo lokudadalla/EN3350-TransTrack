@@ -4,10 +4,9 @@ import { getUser } from "../auth"; // adjust path if needed
 import type { ZoomHandle, DisplayAnomaly, AnomalyMeta } from "../types/models";
 import { ZoomableImage, isFiniteNumber } from "../components/ZoomableImage";
 import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition } from "../types/models";
-import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection } from "../api/Inspections";
+import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly } from "../api/Inspections";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
-
 
 
 const ui = {
@@ -128,6 +127,94 @@ export default function InspectionDetail() {
   const activeXhr = useRef<XMLHttpRequest | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+
+  const [savingIdx, setSavingIdx] = useState<number | null>(null);
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
+
+
+  async function saveEditsForIndex(idx: number) {
+    if (!maintMeta?.id) return;
+    const all = (maintMeta.anomalies ?? []).map(a => ({
+      id: a.id,
+      x: a.x, y: a.y, width: a.width, height: a.height,
+      label: a.label, score: a.score, size: a.size,
+    }));
+
+    if (!all[idx]) return;
+
+    try {
+      setSavingIdx(idx);
+      setSaveError(null);
+      setSaveSuccess(null);
+
+      const updated = await saveImageAnomalies({
+        ownerInspectionId: numericInspectionId,
+        imageId: maintMeta.id,
+        anomalies: all,
+      });
+
+      if (updated) setMaintMeta(updated); // if API returns fresh ImageMeta
+      setSaveSuccess(`Anomaly #${idx + 1} saved.`);
+    } catch (e: any) {
+      setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
+    } finally {
+      setSavingIdx(null);
+    }
+  }
+
+
+  async function deleteAnomalyAtIndex(idx: number) {
+    if (!maintMeta?.id) return;
+    const current = maintMeta.anomalies ?? [];
+    const target = current[idx];
+    if (!target) return;
+
+    try {
+      setDeletingIdx(idx);
+      setSaveError(null);
+      setSaveSuccess(null);
+
+      // Prefer DELETE when id exists; otherwise PUT filtered list
+      let updated: ImageMeta | null = null;
+
+      if (typeof target.id === "number" && Number.isFinite(target.id)) {
+        updated = await deleteImageAnomaly({
+          ownerInspectionId: numericInspectionId,
+          imageId: maintMeta.id,
+          anomalyId: target.id,
+        });
+        // If backend doesn’t return updated meta, update UI optimistically:
+        if (!updated) {
+          const next = current.filter((_, i) => i !== idx);
+          setMaintMeta(m => (m ? { ...m, anomalies: next } : m));
+        } else {
+          setMaintMeta(updated);
+        }
+      } else {
+        // No id: PUT all anomalies except this one
+        const next = current.filter((_, i) => i !== idx).map(a => ({
+          id: a.id,
+          x: a.x, y: a.y, width: a.width, height: a.height,
+          label: a.label, score: a.score, size: a.size,
+        }));
+        updated = await deleteImageAnomaly({
+          ownerInspectionId: numericInspectionId,
+          imageId: maintMeta.id,
+          nextAnomalies: next,
+        });
+        setMaintMeta(updated ?? (m => (m ? { ...m!, anomalies: next } : m)));
+      }
+
+      setSaveSuccess(`Anomaly #${idx + 1} deleted.`);
+    } catch (e: any) {
+      setSaveError(e?.message ?? `Failed to delete anomaly #${idx + 1}`);
+    } finally {
+      setDeletingIdx(null);
+    }
+  }
+
+
+
 
   /* ----- Load inspection header ----- */
   useEffect(() => {
@@ -780,6 +867,11 @@ export default function InspectionDetail() {
                     alt="Current"
                     emptyText="No maintenance image"
                     anomalies={maintAnomalies}
+                    editable
+                    onChangeAnomalies={(next) => {
+                      // you likely want to persist this back to maintMeta and/or server
+                      setMaintMeta((m) => (m ? { ...m, anomalies: next } : m));
+                    }}
                   />
                 </Figure>
               </div>
@@ -788,19 +880,68 @@ export default function InspectionDetail() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 12,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gap: 16,
                     marginTop: 12,
+                    alignItems: "start",
                   }}
                 >
+                  {/* Left: Baseline anomalies */}
                   {baselineAnomalies.length > 0 && (
                     <AnomalyLegend title="Baseline anomalies" items={baselineAnomalies} />
                   )}
+
                   {maintAnomalies.length > 0 && (
-                    <AnomalyLegend title="Current anomalies" items={maintAnomalies} />
-                  )}
+                  <AnomalyLegend
+                    title="Current anomalies"
+                    items={maintAnomalies}
+                    rightRenderer={(_, i) => (
+                      <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => saveEditsForIndex(i)}
+                        disabled={savingIdx === i || deletingIdx === i}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 10,
+                          border: "1px solid #c3d21aff",
+                          background: savingIdx === i ? "#1f2a44" : "#0b1224",
+                          color: "#e2e8f0",
+                          fontWeight: 800,
+                          cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
+                          boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+                          minWidth: 88,
+                        }}
+                        title="Save edited bbox"
+                      >
+                        {savingIdx === i ? "saving..." : "save edits"}
+                      </button>
+
+                      <button
+                        onClick={() => deleteAnomalyAtIndex(i)}
+                        disabled={savingIdx === i || deletingIdx === i}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 10,
+                          border: "1px solid #c3d21aff",
+                          background: deletingIdx === i ? "#3b0f13" : "#1a0f12",
+                          color: "#fecaca",
+                          fontWeight: 800,
+                          cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
+                          boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+                          minWidth: 72,
+                        }}
+                        title="Delete this anomaly"
+                      >
+                        {deletingIdx === i ? "deleting..." : "delete"}
+                      </button>
+                    </div>
+                    )}
+                  />
+                )}
+
                 </div>
               )}
+
 
               {/* Shared zoom control bar below the two images */}
               <div
@@ -931,9 +1072,6 @@ export default function InspectionDetail() {
         </div>
       )}
 
-      <footer style={{ marginTop: 24, color: "#64748b", fontSize: 12 }}>
-        © 2025 TransTrack • University of Moratuwa
-      </footer>
     </div>
   );
 }
@@ -968,3 +1106,5 @@ const zoomBtnStyle = (disabled: boolean): React.CSSProperties => ({
   boxShadow: "0 6px 14px rgba(15,23,42,0.08)",
   transition: "transform .15s ease, box-shadow .15s ease",
 });
+
+
