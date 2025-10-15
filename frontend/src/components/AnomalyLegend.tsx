@@ -1,7 +1,15 @@
+import React from "react";
 import type { DisplayAnomaly } from "../types/models";
 import { isFiniteNumber } from "./ZoomableImage";
 
-export function AnomalyLegend({ title, items }: { title: string; items: DisplayAnomaly[] }) {
+type Props = {
+  title: string;
+  items: DisplayAnomaly[];
+  /** Optional: render a right-side action per row (e.g., a save button) */
+  rightRenderer?: (item: DisplayAnomaly, index: number) => React.ReactNode;
+};
+
+export function AnomalyLegend({ title, items, rightRenderer }: Props) {
   return (
     <div
       style={{
@@ -13,9 +21,12 @@ export function AnomalyLegend({ title, items }: { title: string; items: DisplayA
         gap: 10,
       }}
     >
-      <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: 13, letterSpacing: 0.4 }}>{title}</div>
+      <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: 13, letterSpacing: 0.4 }}>
+        {title}
+      </div>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {items.map((item) => {
+        {items.map((item, i) => {
           const label = item.label?.trim() ? item.label : "Unlabeled anomaly";
           return (
             <div
@@ -29,6 +40,7 @@ export function AnomalyLegend({ title, items }: { title: string; items: DisplayA
                 fontWeight: 700,
               }}
             >
+              {/* left: index + label */}
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span
                   style={{
@@ -47,11 +59,16 @@ export function AnomalyLegend({ title, items }: { title: string; items: DisplayA
                 </span>
                 <span>{label}</span>
               </div>
-              {isFiniteNumber(item.score) && (
-                <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>
-                  Score: {Number(item.score).toFixed(2)}
-                </span>
-              )}
+
+              {/* right: score + optional action */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {isFiniteNumber(item.score) && (
+                  <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>
+                    Score: {Number(item.score).toFixed(2)}
+                  </span>
+                )}
+                {rightRenderer ? rightRenderer(item, i) : null}
+              </div>
             </div>
           );
         })}

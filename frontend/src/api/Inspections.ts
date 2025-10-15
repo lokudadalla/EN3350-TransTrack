@@ -1,5 +1,5 @@
 import { getUser } from "../auth";
-import type { ImageMeta } from "../types/models";
+import type { ImageMeta, ImageType, Condition, AnomalyMeta } from "../types/models";
 
 
 export type InspectionDTO = {
@@ -71,6 +71,16 @@ async function fetchImageMeta(ownerInspectionId: number, imageId: number): Promi
   }
 }
 
+export async function maintenanceForThisInspection(numericInspectionId: number): Promise<ImageMeta | null> {
+      const r = await fetch(api(`/inspections/${numericInspectionId}/images?type=MAINTENANCE`), {
+          headers: { ...authHeaders() }, 
+        });
+      if (!r.ok) return null;
+      const arr: ImageMeta[] = await r.json();
+      if (!arr?.length) return null;
+      return arr.slice().sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
+    }
+
 
 export async function pollUntilAnomalies(opts: {
   ownerInspectionId: number;
@@ -105,4 +115,137 @@ export async function resolveImageUrl(ownerInspectionId: number, meta: ImageMeta
     const blob = await res.blob();
     setUrl(URL.createObjectURL(blob));
   } catch {}
+}
+
+
+// NEW: list all inspections for this transformer
+ export async function getInspectionIdsForTransformer(transformerNo?: string): Promise<number[]> {
+    if (!transformerNo) return [];
+    try {
+      const res = await fetch(api(`/inspections/by-no?no=${encodeURIComponent(transformerNo)}`), {
+        headers: { ...authHeaders() },
+      });
+      if (!res.ok) return [];
+      const list: InspectionDTO[] = await res.json();
+      // sort newest first just in case (not strictly required)
+      list.sort((a, b) => {
+        const at = new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() || new Date(a.createdAt).getTime();
+        const bt = new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() || new Date(b.createdAt).getTime();
+        return bt - at;
+      });
+      return list.map(x => x.inspectionNo);
+    } catch {
+      return [];
+    }
+  }
+
+
+  // NEW: post the file to a specific inspection (no progress UI; used for “other” inspections)
+  export async function uploadImageToInspection(opts: {
+      inspectionId: number;
+      type: ImageType;
+      file: File | Blob;
+      condition: Condition;
+      uploader?: string;
+    }) {
+      const { inspectionId, type, file, condition, uploader = "web" } = opts;
+      const url = new URL(api(`/inspections/${inspectionId}/images`));
+      url.searchParams.set("type", type);
+      url.searchParams.set("uploader", uploader);
+      url.searchParams.set("condition", condition);
+  
+      const fd = new FormData();
+      // IMPORTANT: if `file` is a Blob copy, give it a filename so backend saves correctly.
+      const named = file instanceof File ? file : new File([file], `baseline${inspectionId}.jpg`, { type: "image/jpeg" });
+      fd.append("files", named);
+  
+      await fetch(url.toString(), {
+        method: "POST",
+        headers: { ...authHeaders() }, // X-User-Id
+        body: fd,
+      }).catch(() => { /* swallow – we don’t want to break the primary upload UX */ });
+    }
+
+
+
+
+export async function saveImageAnomalies(args: {
+  ownerInspectionId: number;
+  imageId: number;
+  anomalies: AnomalyMeta[];
+}) {
+  const { ownerInspectionId, imageId, anomalies } = args;
+  console.log(`Saving anomalies:${JSON.stringify(anomalies)} and imageId:${imageId} and ownerInspectionId:${ownerInspectionId}`);
+
+  const res = await fetch(
+    api(`/inspections/${ownerInspectionId}/images/${imageId}/anomalies`),
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(anomalies),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Failed to save anomalies (${res.status}). ${text}`);
+  }
+
+  try {
+    return (await res.json()) as ImageMeta; // if backend returns updated meta
+  } catch {
+    return null as unknown as ImageMeta;
+  }
+}
+
+
+
+/**
+ * Delete a single anomaly.
+ * - If anomalyId provided: call DELETE /.../anomalies/:anomalyId
+ * - Else: fall back to PUT the remaining anomalies array (nextAnomalies)
+ */
+export async function deleteImageAnomaly(
+  args:
+    | { ownerInspectionId: number; imageId: number; anomalyId: number }
+    | { ownerInspectionId: number; imageId: number; nextAnomalies: AnomalyMeta[] }
+) {
+  if ("anomalyId" in args) {
+    const { ownerInspectionId, imageId, anomalyId } = args;
+    console.log(`Deleting anomalyId:${anomalyId} for imageId:${imageId} and ownerInspectionId:${ownerInspectionId}`);
+    const res = await fetch(
+      api(`/inspections/${ownerInspectionId}/images/${imageId}/anomalies/${anomalyId}`),
+      { method: "DELETE", headers: { ...authHeaders() } }
+    );
+    if (!res.ok && res.status !== 204) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Failed to delete anomaly (${res.status}). ${text}`);
+    }
+    // Some backends return updated ImageMeta; try JSON, else return null.
+    try { return (await res.json()) as ImageMeta; } catch { return null as unknown as ImageMeta; }
+  } else {
+    const { ownerInspectionId, imageId, nextAnomalies } = args;
+    return await saveImageAnomalies({ ownerInspectionId, imageId, anomalies: nextAnomalies });
+  }
+}
+
+
+// POST one anomaly (if your backend supports it); else we'll fall back to PUT-all
+export async function createImageAnomaly(args: {
+  ownerInspectionId: number;
+  imageId: number;
+  anomaly: AnomalyMeta;
+}) {
+  const { ownerInspectionId, imageId, anomaly } = args;
+  console.log(`Creating anomaly:${JSON.stringify(anomaly)} for imageId:${imageId} and ownerInspectionId:${ownerInspectionId}`);
+  const res = await fetch(
+    api(`/inspections/${ownerInspectionId}/images/${imageId}/anomalies`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(anomaly),
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to create anomaly (${res.status})`);
+  try { return (await res.json()) as ImageMeta; } catch { return null as unknown as ImageMeta; }
 }

@@ -1,94 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getUser } from "../auth"; // adjust path if needed
-import type { ZoomHandle, DisplayAnomaly, AnomalyMeta } from "../types/models";
-import { ZoomableImage, isFiniteNumber } from "../components/ZoomableImage";
-import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition } from "../types/models";
-import { pollUntilAnomalies, resolveImageUrl, authHeaders, api } from "../api/Inspections";
+import type { ZoomHandle } from "../types/models";
+import { ZoomableImage } from "../components/ZoomableImage";
+import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition, AnomalyMeta } from "../types/models";
+import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly, createImageAnomaly } from "../api/Inspections";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
 
-
-
-const ui = {
-  bg: "#f6f8fb",
-  card: "#fff",
-  text: "#0f172a",
-  sub: "#64748b",
-  border: "#e6eaf2",
-  primary: "#3f51b5",
-  danger: "#dc2626",
-  warnBg: "rgba(250,204,21,.20)",
-  warn: "#ca8a04",
-  okBg: "rgba(34,197,94,.12)",
-  ok: "#16a34a",
-  errBg: "rgba(244,63,94,.12)",
-  err: "#f43f5e",
-  shadow: "0 10px 30px rgba(31,41,55,.08)",
-};
-
-
-
-
-function toNiceDateTime(d: string, t: string) {
-  const dt = new Date(`${d}T${t}`);
-  return dt.toLocaleString("en-US", {
-    weekday: "short",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function clampThreshold(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
-
-function pill(status: Status): React.CSSProperties {
-  if (status === "Completed")
-    return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.okBg, color: ui.ok };
-  if (status === "In Progress")
-    return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.warnBg, color: ui.warn };
-  return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.errBg, color: ui.err };
-}
-
-const chipWrap: React.CSSProperties = {
-  background: "#eef2ff",
-  border: "1px solid #e0e7ff",
-  borderRadius: 16,
-  padding: "12px 16px",
-  minWidth: 110,
-  textAlign: "center",
-  boxShadow: "0 6px 14px rgba(79,70,229,0.12)",
-};
-function Chip({ title, value }: { title: string; value?: string }) {
-  return (
-    <div style={chipWrap}>
-      <div style={{ fontWeight: 900, color: "#111827" }}>{value ?? "-"}</div>
-      <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 700 }}>{title}</div>
-    </div>
-  );
-}
-
-function toDisplayAnomalies(list?: AnomalyMeta[]): DisplayAnomaly[] {
-  if (!Array.isArray(list)) return [];
-  const sanitized: DisplayAnomaly[] = [];
-  for (const item of list) {
-    if (!item) continue;
-    if (!isFiniteNumber(item.width) || !isFiniteNumber(item.height)) continue;
-    if (item.width <= 0 || item.height <= 0) continue;
-    if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) continue;
-    sanitized.push({ ...item, displayIndex: sanitized.length + 1 });
-  }
-  return sanitized;
-}
-
-
-
-
+// moved out
+import { ui, pill, Chip, iconBtn, zoomBtnStyle } from "../ui/ui";
+import { toNiceDateTime, clampThreshold, toDisplayAnomalies } from "../utils/utils";
 
 /* ---------- Page ---------- */
 export default function InspectionDetail() {
@@ -130,6 +52,94 @@ export default function InspectionDetail() {
   const activeXhr = useRef<XMLHttpRequest | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+
+  const [savingIdx, setSavingIdx] = useState<number | null>(null);
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
+
+  const [addMode, setAddMode] = useState(false);
+  const [draftNew, setDraftNew] = useState<AnomalyMeta | null>(null);
+  const [creatingBusy, setCreatingBusy] = useState(false);
+
+
+  async function saveEditsForIndex(idx: number) {
+    if (!maintMeta?.id) return;
+    const all = (maintMeta.anomalies ?? []).map(a => ({
+      id: a.id,
+      x: a.x, y: a.y, width: a.width, height: a.height,
+      label: a.label, score: a.score, size: a.size,
+    }));
+
+    if (!all[idx]) return;
+
+    try {
+      setSavingIdx(idx);
+      setSaveError(null);
+      setSaveSuccess(null);
+
+      const updated = await saveImageAnomalies({
+        ownerInspectionId: numericInspectionId,
+        imageId: maintMeta.id,
+        anomalies: all,
+      });
+
+      if (updated) setMaintMeta(updated); // if API returns fresh ImageMeta
+      setSaveSuccess(`Anomaly #${idx + 1} saved.`);
+    } catch (e: any) {
+      setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
+    } finally {
+      setSavingIdx(null);
+    }
+  }
+
+  async function deleteAnomalyAtIndex(idx: number) {
+    if (!maintMeta?.id) return;
+    const current = maintMeta.anomalies ?? [];
+    const target = current[idx];
+    if (!target) return;
+
+    try {
+      setDeletingIdx(idx);
+      setSaveError(null);
+      setSaveSuccess(null);
+
+      // Prefer DELETE when id exists; otherwise PUT filtered list
+      let updated: ImageMeta | null = null;
+
+      if (typeof target.id === "number" && Number.isFinite(target.id)) {
+        updated = await deleteImageAnomaly({
+          ownerInspectionId: numericInspectionId,
+          imageId: maintMeta.id,
+          anomalyId: target.id,
+        });
+        // If backend doesn’t return updated meta, update UI optimistically:
+        if (!updated) {
+          const next = current.filter((_, i) => i !== idx);
+          setMaintMeta(m => (m ? { ...m, anomalies: next } : m));
+        } else {
+          setMaintMeta(updated);
+        }
+      } else {
+        // No id: PUT all anomalies except this one
+        const next = current.filter((_, i) => i !== idx).map(a => ({
+          id: a.id,
+          x: a.x, y: a.y, width: a.width, height: a.height,
+          label: a.label, score: a.score, size: a.size,
+        }));
+        updated = await deleteImageAnomaly({
+          ownerInspectionId: numericInspectionId,
+          imageId: maintMeta.id,
+          nextAnomalies: next,
+        });
+        setMaintMeta(updated ?? (m => (m ? { ...m!, anomalies: next } : m)));
+      }
+
+      setSaveSuccess(`Anomaly #${idx + 1} deleted.`);
+    } catch (e: any) {
+      setSaveError(e?.message ?? `Failed to delete anomaly #${idx + 1}`);
+    } finally {
+      setDeletingIdx(null);
+    }
+  }
 
   /* ----- Load inspection header ----- */
   useEffect(() => {
@@ -213,19 +223,9 @@ export default function InspectionDetail() {
       return metas[0];
     }
 
-    async function maintenanceForThisInspection(): Promise<ImageMeta | null> {
-      const r = await fetch(api(`/inspections/${numericInspectionId}/images?type=MAINTENANCE`), {
-          headers: { ...authHeaders() }, 
-        });
-      if (!r.ok) return null;
-      const arr: ImageMeta[] = await r.json();
-      if (!arr?.length) return null;
-      return arr.slice().sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
-    }
-
     (async () => {
       if (!numericInspectionId) return;
-      const [globalBase, maint] = await Promise.all([latestBaselineForTransformer(), maintenanceForThisInspection()]);
+      const [globalBase, maint] = await Promise.all([latestBaselineForTransformer(), maintenanceForThisInspection(numericInspectionId)]);
       if (cancelled) return;
 
       if (globalBase) {
@@ -273,59 +273,11 @@ export default function InspectionDetail() {
     else alert("Delete failed");
   }
 
-  // NEW: list all inspections for this transformer
-  async function getInspectionIdsForTransformer(transformerNo?: string): Promise<number[]> {
-    if (!transformerNo) return [];
-    try {
-      const res = await fetch(api(`/inspections/by-no?no=${encodeURIComponent(transformerNo)}`), {
-        headers: { ...authHeaders() },
-      });
-      if (!res.ok) return [];
-      const list: InspectionDTO[] = await res.json();
-      // sort newest first just in case (not strictly required)
-      list.sort((a, b) => {
-        const at = new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() || new Date(a.createdAt).getTime();
-        const bt = new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() || new Date(b.createdAt).getTime();
-        return bt - at;
-      });
-      return list.map(x => x.inspectionNo);
-    } catch {
-      return [];
-    }
-  }
-
-  // NEW: post the file to a specific inspection (no progress UI; used for “other” inspections)
-  async function uploadImageToInspection(opts: {
-    inspectionId: number;
-    type: ImageType;
-    file: File | Blob;
-    condition: Condition;
-    uploader?: string;
-  }) {
-    const { inspectionId, type, file, condition, uploader = "web" } = opts;
-    const url = new URL(api(`/inspections/${inspectionId}/images`));
-    url.searchParams.set("type", type);
-    url.searchParams.set("uploader", uploader);
-    url.searchParams.set("condition", condition);
-
-    const fd = new FormData();
-    // IMPORTANT: if `file` is a Blob copy, give it a filename so backend saves correctly.
-    const named = file instanceof File ? file : new File([file], `baseline${inspectionId}.jpg`, { type: "image/jpeg" });
-    fd.append("files", named);
-
-    await fetch(url.toString(), {
-      method: "POST",
-      headers: { ...authHeaders() }, // X-User-Id
-      body: fd,
-    }).catch(() => { /* swallow – we don’t want to break the primary upload UX */ });
-  }
-
   // CHANGED: startUpload — baseline path uploads to ALL inspections for the transformer
   function startUpload(t: ImageType, file: File) {
     setUploadPct(0);
     setShowUpload(true);
 
-    // We keep your existing XHR progress UX for the "primary" upload (current inspection).
     const primaryUrl = new URL(api(`/inspections/${numericInspectionId}/images`));
     primaryUrl.searchParams.set("type", t);
     primaryUrl.searchParams.set("uploader", "web");
@@ -346,7 +298,6 @@ export default function InspectionDetail() {
     xhr.onreadystatechange = async () => {
       if (xhr.readyState !== 4) return;
 
-      // We’ll finish the UI state at the end no matter what
       const finish = () => {
         setShowUpload(false);
         activeXhr.current = null;
@@ -358,19 +309,14 @@ export default function InspectionDetail() {
           const latest = list?.[0];
 
           if (t === "BASELINE") {
-            // Update local UI for baseline pointing at *this* inspection (as before)
             setBaselineMeta(latest || null);
             setBaselineOwnerInspectionId(numericInspectionId);
             if (latest) resolveImageUrl(numericInspectionId, latest, (u) => setBaselineUrl(u));
 
-            // NEW: fan-out upload to all other inspections for the same transformer
-            // Reuse the same bytes: clone the file into a Blob so we can send it again.
             const blob = file.slice(0, file.size, file.type);
             const allIds = await getInspectionIdsForTransformer(header.transformerNo);
             const others = allIds.filter(id => id !== numericInspectionId);
 
-            // fire in parallel but don’t block UI — we still complete the modal below
-            // (No progress aggregation here to keep the UI simple.)
             Promise.all(
               others.map(id =>
                 uploadImageToInspection({
@@ -381,10 +327,8 @@ export default function InspectionDetail() {
                   uploader: "web",
                 })
               )
-            ).catch(() => { /* ignore per-inspection failures here; user already got success for the current one */ });
-
+            ).catch(() => {});
           } else {
-            // MAINTENANCE flow stays the same
             setMaintMeta(latest || null);
             if (latest) {
               resolveImageUrl(numericInspectionId, latest, (u) => setMaintUrl(u));
@@ -440,9 +384,7 @@ export default function InspectionDetail() {
   // shared zoom ref for maintenance image
   const zoomRef = useRef<ZoomHandle | null>(null);
   const hasMaint = Boolean(maintUrl);
-  const hasAnyAnomalies = baselineAnomalies.length > 0 || maintAnomalies.length > 0;
-
-
+  
   const numericThreshold = (() => {
     if (typeof temperature === "number") return clampThreshold(temperature);
     if (typeof inspection?.inferenceThreshold === "number") return clampThreshold(inspection.inferenceThreshold);
@@ -837,24 +779,78 @@ export default function InspectionDetail() {
                     alt="Current"
                     emptyText="No maintenance image"
                     anomalies={maintAnomalies}
+                    editable
+                    createMode={addMode}
+                    onCreatePreview={(box) => setDraftNew(box)}
+                    onCreateComplete={(box) => setDraftNew(box)}
+                    onChangeAnomalies={(next) => {
+                      setMaintMeta((m) => (m ? { ...m, anomalies: next } : m));
+                    }}
                   />
+
                 </Figure>
               </div>
 
-              {hasAnyAnomalies && (
+              {(baselineAnomalies.length > 0 || maintAnomalies.length > 0) && (
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 12,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gap: 16,
                     marginTop: 12,
+                    alignItems: "start",
                   }}
                 >
                   {baselineAnomalies.length > 0 && (
                     <AnomalyLegend title="Baseline anomalies" items={baselineAnomalies} />
                   )}
+
                   {maintAnomalies.length > 0 && (
-                    <AnomalyLegend title="Current anomalies" items={maintAnomalies} />
+                    <AnomalyLegend
+                      title="Current anomalies"
+                      items={maintAnomalies}
+                      rightRenderer={(_, i) => (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => saveEditsForIndex(i)}
+                            disabled={savingIdx === i || deletingIdx === i}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 10,
+                              border: "1px solid #c3d21aff",
+                              background: savingIdx === i ? "#1f2a44" : "#0b1224",
+                              color: "#e2e8f0",
+                              fontWeight: 800,
+                              cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
+                              boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+                              minWidth: 88,
+                            }}
+                            title="Save edited bbox"
+                          >
+                            {savingIdx === i ? "saving..." : "save edits"}
+                          </button>
+
+                          <button
+                            onClick={() => deleteAnomalyAtIndex(i)}
+                            disabled={savingIdx === i || deletingIdx === i}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 10,
+                              border: "1px solid #c3d21aff",
+                              background: deletingIdx === i ? "#3b0f13" : "#1a0f12",
+                              color: "#fecaca",
+                              fontWeight: 800,
+                              cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
+                              boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+                              minWidth: 72,
+                            }}
+                            title="Delete this anomaly"
+                          >
+                            {deletingIdx === i ? "deleting..." : "delete"}
+                          </button>
+                        </div>
+                      )}
+                    />
                   )}
                 </div>
               )}
@@ -898,6 +894,74 @@ export default function InspectionDetail() {
                   >
                     Zoom In
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddMode((v) => {
+                        const nv = !v;
+                        if (!nv) setDraftNew(null);
+                        return nv;
+                      });
+                    }}
+                    disabled={!hasMaint || creatingBusy}
+                    style={zoomBtnStyle(!hasMaint || creatingBusy)}
+                  >
+                    {addMode ? "Cancel Add" : "Add bbox"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!maintMeta?.id || !draftNew) return;
+                      try {
+                        setCreatingBusy(true);
+                        setSaveError(null); setSaveSuccess(null);
+
+                        // Prefer POST one; if it fails (501/404), fall back to PUT array
+                        let updated: ImageMeta | null = null;
+                        try {
+                          updated = await createImageAnomaly({
+                            ownerInspectionId: numericInspectionId,
+                            imageId: maintMeta.id,
+                            anomaly: draftNew,
+                          });
+                        } catch {
+                          const next = [...(maintMeta.anomalies ?? []), draftNew].map(a => ({
+                            id: a.id, x: a.x, y: a.y, width: a.width, height: a.height,
+                            label: a.label, score: a.score, size: a.size,
+                          }));
+                          updated = await saveImageAnomalies({
+                            ownerInspectionId: numericInspectionId,
+                            imageId: maintMeta.id,
+                            anomalies: next,
+                          });
+                        }
+
+                        if (updated) setMaintMeta(updated);
+                        else {
+                          // optimistic: attach new anomaly locally with displayIndex
+                          setMaintMeta(m => {
+                            if (!m) return m;
+                            const next = [...(m.anomalies ?? []), { ...draftNew, displayIndex: (m.anomalies?.length ?? 0) + 1 }];
+                            return { ...m, anomalies: next };
+                          });
+                        }
+
+                        setSaveSuccess("New anomaly saved.");
+                        setDraftNew(null);
+                        setAddMode(false);
+                      } catch (e:any) {
+                        setSaveError(e?.message ?? "Failed to create anomaly");
+                      } finally {
+                        setCreatingBusy(false);
+                      }
+                    }}
+                    disabled={!hasMaint || !addMode || !draftNew || creatingBusy}
+                    style={zoomBtnStyle(!hasMaint || !addMode || !draftNew || creatingBusy)}
+                  >
+                    Save
+                  </button>
+
                 </div>
               </div>
             </>
@@ -988,40 +1052,6 @@ export default function InspectionDetail() {
         </div>
       )}
 
-      <footer style={{ marginTop: 24, color: "#64748b", fontSize: 12 }}>
-        © 2025 TransTrack • University of Moratuwa
-      </footer>
     </div>
   );
 }
-
-/* ---------- Tiny UI bits ---------- */
-function iconBtn(disabled: boolean, danger?: boolean): React.CSSProperties {
-  return {
-    width: 30,
-    height: 30,
-    display: "grid",
-    placeItems: "center",
-    background: "#fff",
-    border: "1px solid #e0e7ff",
-    borderRadius: 8,
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 16,
-    lineHeight: 1,
-    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-    opacity: disabled ? 0.5 : 1,
-    color: danger ? "#dc2626" : "#4338ca",
-  };
-}
-const zoomBtnStyle = (disabled: boolean): React.CSSProperties => ({
-  padding: "8px 14px",
-  borderRadius: 10,
-  border: `1px solid ${ui.border}`,
-  background: disabled ? "#f8fafc" : "#fff",
-  color: disabled ? "#94a3b8" : ui.text,
-  fontWeight: 800,
-  fontSize: 13,
-  cursor: disabled ? "not-allowed" : "pointer",
-  boxShadow: "0 6px 14px rgba(15,23,42,0.08)",
-  transition: "transform .15s ease, box-shadow .15s ease",
-});
