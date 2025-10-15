@@ -1,91 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getUser } from "../auth"; // adjust path if needed
-import type { ZoomHandle, DisplayAnomaly, AnomalyMeta } from "../types/models";
-import { ZoomableImage, isFiniteNumber } from "../components/ZoomableImage";
+import type { ZoomHandle } from "../types/models";
+import { ZoomableImage } from "../components/ZoomableImage";
 import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition } from "../types/models";
 import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly } from "../api/Inspections";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
 
-
-const ui = {
-  bg: "#f6f8fb",
-  card: "#fff",
-  text: "#0f172a",
-  sub: "#64748b",
-  border: "#e6eaf2",
-  primary: "#3f51b5",
-  danger: "#dc2626",
-  warnBg: "rgba(250,204,21,.20)",
-  warn: "#ca8a04",
-  okBg: "rgba(34,197,94,.12)",
-  ok: "#16a34a",
-  errBg: "rgba(244,63,94,.12)",
-  err: "#f43f5e",
-  shadow: "0 10px 30px rgba(31,41,55,.08)",
-};
-
-
-function toNiceDateTime(d: string, t: string) {
-  const dt = new Date(`${d}T${t}`);
-  return dt.toLocaleString("en-US", {
-    weekday: "short",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function clampThreshold(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
-
-function pill(status: Status): React.CSSProperties {
-  if (status === "Completed")
-    return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.okBg, color: ui.ok };
-  if (status === "In Progress")
-    return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.warnBg, color: ui.warn };
-  return { display: "inline-flex", padding: "6px 12px", borderRadius: 999, fontWeight: 800, background: ui.errBg, color: ui.err };
-}
-
-const chipWrap: React.CSSProperties = {
-  background: "#eef2ff",
-  border: "1px solid #e0e7ff",
-  borderRadius: 16,
-  padding: "12px 16px",
-  minWidth: 110,
-  textAlign: "center",
-  boxShadow: "0 6px 14px rgba(79,70,229,0.12)",
-};
-function Chip({ title, value }: { title: string; value?: string }) {
-  return (
-    <div style={chipWrap}>
-      <div style={{ fontWeight: 900, color: "#111827" }}>{value ?? "-"}</div>
-      <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 700 }}>{title}</div>
-    </div>
-  );
-}
-
-function toDisplayAnomalies(list?: AnomalyMeta[]): DisplayAnomaly[] {
-  if (!Array.isArray(list)) return [];
-  const sanitized: DisplayAnomaly[] = [];
-  for (const item of list) {
-    if (!item) continue;
-    if (!isFiniteNumber(item.width) || !isFiniteNumber(item.height)) continue;
-    if (item.width <= 0 || item.height <= 0) continue;
-    if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) continue;
-    sanitized.push({ ...item, displayIndex: sanitized.length + 1 });
-  }
-  return sanitized;
-}
-
-
-
-
+// moved out
+import { ui, pill, Chip, iconBtn, zoomBtnStyle } from "../ui/ui";
+import { toNiceDateTime, clampThreshold, toDisplayAnomalies } from "../utils/utils";
 
 /* ---------- Page ---------- */
 export default function InspectionDetail() {
@@ -131,7 +56,6 @@ export default function InspectionDetail() {
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
 
-
   async function saveEditsForIndex(idx: number) {
     if (!maintMeta?.id) return;
     const all = (maintMeta.anomalies ?? []).map(a => ({
@@ -161,7 +85,6 @@ export default function InspectionDetail() {
       setSavingIdx(null);
     }
   }
-
 
   async function deleteAnomalyAtIndex(idx: number) {
     if (!maintMeta?.id) return;
@@ -212,9 +135,6 @@ export default function InspectionDetail() {
       setDeletingIdx(null);
     }
   }
-
-
-
 
   /* ----- Load inspection header ----- */
   useEffect(() => {
@@ -298,7 +218,6 @@ export default function InspectionDetail() {
       return metas[0];
     }
 
-
     (async () => {
       if (!numericInspectionId) return;
       const [globalBase, maint] = await Promise.all([latestBaselineForTransformer(), maintenanceForThisInspection(numericInspectionId)]);
@@ -349,13 +268,11 @@ export default function InspectionDetail() {
     else alert("Delete failed");
   }
 
-
   // CHANGED: startUpload — baseline path uploads to ALL inspections for the transformer
   function startUpload(t: ImageType, file: File) {
     setUploadPct(0);
     setShowUpload(true);
 
-    // We keep your existing XHR progress UX for the "primary" upload (current inspection).
     const primaryUrl = new URL(api(`/inspections/${numericInspectionId}/images`));
     primaryUrl.searchParams.set("type", t);
     primaryUrl.searchParams.set("uploader", "web");
@@ -376,7 +293,6 @@ export default function InspectionDetail() {
     xhr.onreadystatechange = async () => {
       if (xhr.readyState !== 4) return;
 
-      // We’ll finish the UI state at the end no matter what
       const finish = () => {
         setShowUpload(false);
         activeXhr.current = null;
@@ -388,19 +304,14 @@ export default function InspectionDetail() {
           const latest = list?.[0];
 
           if (t === "BASELINE") {
-            // Update local UI for baseline pointing at *this* inspection (as before)
             setBaselineMeta(latest || null);
             setBaselineOwnerInspectionId(numericInspectionId);
             if (latest) resolveImageUrl(numericInspectionId, latest, (u) => setBaselineUrl(u));
 
-            // NEW: fan-out upload to all other inspections for the same transformer
-            // Reuse the same bytes: clone the file into a Blob so we can send it again.
             const blob = file.slice(0, file.size, file.type);
             const allIds = await getInspectionIdsForTransformer(header.transformerNo);
             const others = allIds.filter(id => id !== numericInspectionId);
 
-            // fire in parallel but don’t block UI — we still complete the modal below
-            // (No progress aggregation here to keep the UI simple.)
             Promise.all(
               others.map(id =>
                 uploadImageToInspection({
@@ -411,10 +322,8 @@ export default function InspectionDetail() {
                   uploader: "web",
                 })
               )
-            ).catch(() => { /* ignore per-inspection failures here; user already got success for the current one */ });
-
+            ).catch(() => {});
           } else {
-            // MAINTENANCE flow stays the same
             setMaintMeta(latest || null);
             if (latest) {
               resolveImageUrl(numericInspectionId, latest, (u) => setMaintUrl(u));
@@ -470,9 +379,7 @@ export default function InspectionDetail() {
   // shared zoom ref for maintenance image
   const zoomRef = useRef<ZoomHandle | null>(null);
   const hasMaint = Boolean(maintUrl);
-  const hasAnyAnomalies = baselineAnomalies.length > 0 || maintAnomalies.length > 0;
-
-
+  
   const numericThreshold = (() => {
     if (typeof temperature === "number") return clampThreshold(temperature);
     if (typeof inspection?.inferenceThreshold === "number") return clampThreshold(inspection.inferenceThreshold);
@@ -869,14 +776,13 @@ export default function InspectionDetail() {
                     anomalies={maintAnomalies}
                     editable
                     onChangeAnomalies={(next) => {
-                      // you likely want to persist this back to maintMeta and/or server
                       setMaintMeta((m) => (m ? { ...m, anomalies: next } : m));
                     }}
                   />
                 </Figure>
               </div>
 
-              {hasAnyAnomalies && (
+              {(baselineAnomalies.length > 0 || maintAnomalies.length > 0) && (
                 <div
                   style={{
                     display: "grid",
@@ -886,62 +792,59 @@ export default function InspectionDetail() {
                     alignItems: "start",
                   }}
                 >
-                  {/* Left: Baseline anomalies */}
                   {baselineAnomalies.length > 0 && (
                     <AnomalyLegend title="Baseline anomalies" items={baselineAnomalies} />
                   )}
 
                   {maintAnomalies.length > 0 && (
-                  <AnomalyLegend
-                    title="Current anomalies"
-                    items={maintAnomalies}
-                    rightRenderer={(_, i) => (
-                      <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        onClick={() => saveEditsForIndex(i)}
-                        disabled={savingIdx === i || deletingIdx === i}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 10,
-                          border: "1px solid #c3d21aff",
-                          background: savingIdx === i ? "#1f2a44" : "#0b1224",
-                          color: "#e2e8f0",
-                          fontWeight: 800,
-                          cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
-                          boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
-                          minWidth: 88,
-                        }}
-                        title="Save edited bbox"
-                      >
-                        {savingIdx === i ? "saving..." : "save edits"}
-                      </button>
+                    <AnomalyLegend
+                      title="Current anomalies"
+                      items={maintAnomalies}
+                      rightRenderer={(_, i) => (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => saveEditsForIndex(i)}
+                            disabled={savingIdx === i || deletingIdx === i}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 10,
+                              border: "1px solid #c3d21aff",
+                              background: savingIdx === i ? "#1f2a44" : "#0b1224",
+                              color: "#e2e8f0",
+                              fontWeight: 800,
+                              cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
+                              boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+                              minWidth: 88,
+                            }}
+                            title="Save edited bbox"
+                          >
+                            {savingIdx === i ? "saving..." : "save edits"}
+                          </button>
 
-                      <button
-                        onClick={() => deleteAnomalyAtIndex(i)}
-                        disabled={savingIdx === i || deletingIdx === i}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 10,
-                          border: "1px solid #c3d21aff",
-                          background: deletingIdx === i ? "#3b0f13" : "#1a0f12",
-                          color: "#fecaca",
-                          fontWeight: 800,
-                          cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
-                          boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
-                          minWidth: 72,
-                        }}
-                        title="Delete this anomaly"
-                      >
-                        {deletingIdx === i ? "deleting..." : "delete"}
-                      </button>
-                    </div>
-                    )}
-                  />
-                )}
-
+                          <button
+                            onClick={() => deleteAnomalyAtIndex(i)}
+                            disabled={savingIdx === i || deletingIdx === i}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 10,
+                              border: "1px solid #c3d21aff",
+                              background: deletingIdx === i ? "#3b0f13" : "#1a0f12",
+                              color: "#fecaca",
+                              fontWeight: 800,
+                              cursor: savingIdx === i || deletingIdx === i ? "not-allowed" : "pointer",
+                              boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+                              minWidth: 72,
+                            }}
+                            title="Delete this anomaly"
+                          >
+                            {deletingIdx === i ? "deleting..." : "delete"}
+                          </button>
+                        </div>
+                      )}
+                    />
+                  )}
                 </div>
               )}
-
 
               {/* Shared zoom control bar below the two images */}
               <div
@@ -1075,36 +978,3 @@ export default function InspectionDetail() {
     </div>
   );
 }
-
-/* ---------- Tiny UI bits ---------- */
-function iconBtn(disabled: boolean, danger?: boolean): React.CSSProperties {
-  return {
-    width: 30,
-    height: 30,
-    display: "grid",
-    placeItems: "center",
-    background: "#fff",
-    border: "1px solid #e0e7ff",
-    borderRadius: 8,
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 16,
-    lineHeight: 1,
-    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-    opacity: disabled ? 0.5 : 1,
-    color: danger ? "#dc2626" : "#4338ca",
-  };
-}
-const zoomBtnStyle = (disabled: boolean): React.CSSProperties => ({
-  padding: "8px 14px",
-  borderRadius: 10,
-  border: `1px solid ${ui.border}`,
-  background: disabled ? "#f8fafc" : "#fff",
-  color: disabled ? "#94a3b8" : ui.text,
-  fontWeight: 800,
-  fontSize: 13,
-  cursor: disabled ? "not-allowed" : "pointer",
-  boxShadow: "0 6px 14px rgba(15,23,42,0.08)",
-  transition: "transform .15s ease, box-shadow .15s ease",
-});
-
-
