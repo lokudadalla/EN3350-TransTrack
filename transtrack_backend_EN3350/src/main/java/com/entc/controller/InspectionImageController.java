@@ -2,7 +2,9 @@ package com.entc.controller;
 
 import com.entc.dao.EnvironmentCondition;
 import com.entc.dao.ImageType;
+import com.entc.dao.InspectionImage;
 import com.entc.dto.InspectionImageDto;
+import com.entc.dto.AnomalyUpsertDto;
 import com.entc.service.InferenceService;
 import com.entc.service.InspectionImageService;
 import lombok.RequiredArgsConstructor;
@@ -102,5 +104,33 @@ public class InspectionImageController {
             @PathVariable Long imageId
     ) throws IOException {
         imageService.delete(requireUserId(xUserId), inspectionId, imageId);
+    }
+
+    @PutMapping("/{imageId}/anomalies")
+    public InspectionImageDto replaceAnomalies(
+            @RequestHeader("X-User-Id") String xUserId,
+            @PathVariable Long inspectionId,
+            @PathVariable Long imageId,
+            @RequestBody List<AnomalyUpsertDto> body
+    ) throws IOException {
+        InspectionImage updated = imageService.replaceAnomalies(
+                requireUserId(xUserId), inspectionId, imageId, body);
+        return InspectionImageDto.from(updated);
+    }
+
+    @DeleteMapping("/{imageId}/anomalies/{anomalyId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAnomaly(
+            @RequestHeader("X-User-Id") String xUserId,
+            @PathVariable Long inspectionId,
+            @PathVariable Long imageId,
+            @PathVariable Long anomalyId
+    ) throws IOException {
+        imageService.deleteAnomaly(
+                requireUserId(xUserId),
+                inspectionId,
+                imageId,
+                anomalyId
+        );
     }
 }
