@@ -1,5 +1,6 @@
 package com.entc.service;
 
+import com.entc.dao.AnomalyType;
 import com.entc.dao.EnvironmentCondition;
 import com.entc.dao.ImageType;
 import com.entc.dao.InspectionImage;
@@ -99,9 +100,11 @@ public class InspectionImageService {
     }
 
     @Transactional
-    public InspectionImage replaceAnomalies(Long userId, Long inspectionId, Long imageId,
-                                            List<AnomalyUpsertDto> newAnomalies) throws IOException {
-        InspectionImage img = imageRepo.findByIdAndInspection_UserId(imageId, userId)
+    public InspectionImage replaceAnomalies(
+            Long userId, Long inspectionId, Long imageId,
+            List<AnomalyUpsertDto> newAnomalies) throws IOException {
+
+        var img = imageRepo.findByIdAndInspection_UserId(imageId, userId)
                 .filter(i -> i.getInspection().getInspectionNo().equals(inspectionId))
                 .orElseThrow(() -> new IOException("Image not found"));
 
@@ -118,8 +121,18 @@ public class InspectionImageService {
                 a.setLabel(dto.label());
                 a.setScore(dto.score());
                 a.setSize(dto.size());
+                a.setComment(dto.comment());
+
+                // default to AI_GENERATED if FE didn’t send origin
+                a.setOrigin(dto.origin() != null ? dto.origin() : AnomalyType.AI_GENERATED);
+
+                // latest editor stamp
+                a.setLastEditedAt(java.time.LocalDateTime.now());
+                a.setLastEditedBy(userId);
+
                 return a;
             }).toList();
+
             anomalyRepo.saveAll(toSave);
         }
 

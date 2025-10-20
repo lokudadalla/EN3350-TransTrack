@@ -49,6 +49,9 @@ public class InspectionImage {
     @Column(nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
+    @Column(name = "ai_anomalies_json", columnDefinition = "LONGTEXT")
+    private String aiAnomaliesJson;
+
     @OneToMany(
     mappedBy = "inspectionImage",
     fetch = FetchType.LAZY,
