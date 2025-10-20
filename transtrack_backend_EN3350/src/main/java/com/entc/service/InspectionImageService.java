@@ -3,6 +3,9 @@ package com.entc.service;
 import com.entc.dao.EnvironmentCondition;
 import com.entc.dao.ImageType;
 import com.entc.dao.InspectionImage;
+import com.entc.dao.InspectionImageAnomaly;
+import com.entc.dto.AnomalyUpsertDto;
+import com.entc.repository.InspectionImageAnomalyRepository;
 import com.entc.repository.InspectionImageRepository;
 import com.entc.repository.InspectionRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +26,9 @@ public class InspectionImageService {
 
     private final InspectionRepository inspectionRepo;
     private final InspectionImageRepository imageRepo;
+    private final InspectionImageAnomalyRepository anomalyRepo;
     private final StorageService storage;
+    
 
     @Transactional
     public List<InspectionImage> upload(Long userId, Long inspectionId, ImageType type,
@@ -91,5 +96,48 @@ public class InspectionImageService {
         return (type == null)
                 ? imageRepo.findAllWithAnomalies(inspectionId)
                 : imageRepo.findAllWithAnomaliesByType(inspectionId, type);
+    }
+
+    @Transactional
+    public InspectionImage replaceAnomalies(Long userId, Long inspectionId, Long imageId,
+                                            List<AnomalyUpsertDto> newAnomalies) throws IOException {
+        InspectionImage img = imageRepo.findByIdAndInspection_UserId(imageId, userId)
+                .filter(i -> i.getInspection().getInspectionNo().equals(inspectionId))
+                .orElseThrow(() -> new IOException("Image not found"));
+
+        anomalyRepo.deleteByInspectionImage_Id(img.getId());
+
+        if (newAnomalies != null && !newAnomalies.isEmpty()) {
+            var toSave = newAnomalies.stream().map(dto -> {
+                var a = new InspectionImageAnomaly();
+                a.setInspectionImage(img);
+                a.setX(dto.x());
+                a.setY(dto.y());
+                a.setWidth(dto.width());
+                a.setHeight(dto.height());
+                a.setLabel(dto.label());
+                a.setScore(dto.score());
+                a.setSize(dto.size());
+                return a;
+            }).toList();
+            anomalyRepo.saveAll(toSave);
+        }
+
+        return imageRepo.findOneWithAnomalies(img.getId()).orElse(img);
+    }
+
+    @Transactional
+    public void deleteAnomaly(Long userId, Long inspectionId, Long imageId, Long anomalyId) throws IOException {
+        // verify the image belongs to this user & inspection
+        var img = imageRepo.findByIdAndInspection_UserId(imageId, userId)
+                .filter(i -> i.getInspection().getInspectionNo().equals(inspectionId))
+                .orElseThrow(() -> new IOException("Image not found"));
+
+        // verify the anomaly belongs to that image
+        var anomaly = anomalyRepo.findById(anomalyId)
+                .filter(a -> a.getInspectionImage().getId().equals(img.getId()))
+                .orElseThrow(() -> new IOException("Anomaly not found"));
+
+        anomalyRepo.delete(anomaly);
     }
 }
