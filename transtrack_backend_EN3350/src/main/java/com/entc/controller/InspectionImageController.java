@@ -61,6 +61,7 @@ public class InspectionImageController {
                 throw new IOException("Exactly one MAINTENANCE image must be uploaded at a time");
             }
             var withAnoms = inferenceService.runForMaintenance(userId, inspectionId, saved.get(0).getId());
+            System.out.println("returning MAINTENANCE image with anomalies:" + withAnoms.getAiAnomaliesJson());
             return List.of(InspectionImageDto.from(withAnoms));
         }
 

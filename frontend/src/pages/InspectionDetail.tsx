@@ -111,7 +111,7 @@ const [notes, setNotes] = useState<string>("");
    ...(i === idx
        ? (notes.trim() ? { comment: notes } : {})               // set or omit
        : (a.comment !== undefined ? { comment: a.comment } : {})),
-   ...(a.origin ? { origin: a.origin } : { origin: (a.id ? "USER_EDITED" : "USER_ADDED") as AnomalyOrigin }),
+   origin: "USER_EDITED" as AnomalyOrigin,
  }));
 
   if (!all[idx]) return;
@@ -133,7 +133,7 @@ const [notes, setNotes] = useState<string>("");
       setSelectedIdx(idx);
       setNotes(updated.anomalies?.[idx]?.comment ?? "");
     }
-    setSaveSuccess(`Anomaly #${idx + 1} saved.`);
+    setSaveSuccess(`Anomaly ${idx + 1} saved.`);
   } catch (e: any) {
     setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
   } finally {
@@ -309,11 +309,55 @@ const [notes, setNotes] = useState<string>("");
 
   /* ----- Helpers: view/delete/upload ----- */
 
+  // put near other helpers
+function sameBox(a: AnomalyMeta, b: AnomalyMeta, tol = 2): boolean {
+  // Prefer id if both have one
+  if (typeof a.id === "number" && typeof b.id === "number" && a.id === b.id) return true;
 
-  function editorName(a?: AnomalyMeta): string {
+  const close = (p: number, q: number) => Math.abs(p - q) <= tol;
+  const labelSame =
+    (a.label ?? "").trim().toLowerCase() === (b.label ?? "").trim().toLowerCase();
+
+  return (
+    close(a.x, b.x) &&
+    close(a.y, b.y) &&
+    close(a.width, b.width) &&
+    close(a.height, b.height) &&
+    labelSame
+  );
+}
+
+type LogSource = "AI" | "USER";
+type LogItem = (AnomalyMeta & { source: LogSource; humanIndex?: number });
+
+const mergedLogs = useMemo<LogItem[]>(() => {
+  const ai = toDisplayAnomalies(maintMeta?.aiAnomalies).map(a => ({
+    ...a,
+    source: "AI" as const
+  }));
+
+  const humanRaw = toDisplayAnomalies(maintMeta?.anomalies);
+  const human = humanRaw
+    .map((a, idx) => ({ ...a, source: "USER" as const, humanIndex: idx }))
+    .filter(u => !ai.some(aiBox => sameBox(aiBox, u))); // de-dup against AI
+
+  return [...ai, ...human]; // AI first
+}, [maintMeta]);
+
+
+
+//   function editorName(a?: AnomalyMeta): string {
+//   if (!a) return "-";
+//   if (a.origin === "AI_GENERATED" || a.lastEditedBy == null) return "AI Generated";
+//   const me = getUser(); // assume { id, name } or similar
+//   if (me && a.lastEditedBy === me.id && me.username) return me.username;
+//   return `User #${a.lastEditedBy}`;
+// }
+
+function editorName(a?: AnomalyMeta): string {
   if (!a) return "-";
   if (a.origin === "AI_GENERATED" || a.lastEditedBy == null) return "AI Generated";
-  const me = getUser(); // assume { id, name } or similar
+  const me = getUser();
   if (me && a.lastEditedBy === me.id && me.username) return me.username;
   return `User #${a.lastEditedBy}`;
 }
@@ -1138,9 +1182,9 @@ function updateAnomalyLabelAt(i: number, label: string) {
     padding: 16,
   }}
 >
-  <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>Errors</div>
+  {/*<div style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>Errors</div>
 
-  <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+   <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
     {(maintMeta?.anomalies ?? []).map((a, i) => {
       const who = editorName(a);
       const when = a?.lastEditedAt
@@ -1204,7 +1248,84 @@ function updateAnomalyLabelAt(i: number, label: string) {
     {!(maintMeta?.anomalies?.length) && (
       <div style={{ color: ui.sub, fontWeight: 700 }}>No anomalies yet.</div>
     )}
-  </div>
+  </div> */}
+
+  <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>Errors</div>
+
+<div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+  {mergedLogs.map((item, idx) => {
+    const isAI = item.source === "AI";
+    const who =
+      isAI ? "AI Generated" : editorName(item); // your editorName still works for user rows
+    const when = item?.lastEditedAt
+      ? new Date(item.lastEditedAt).toLocaleString()
+      : (maintMeta?.uploadedAt ? new Date(maintMeta.uploadedAt).toLocaleString() : "-");
+
+    const isSelected = selectedIdx === item.humanIndex && !isAI; // only user rows are selectable/editable
+
+    return (
+      <button
+        key={`${item.source}-${item.id ?? `${item.x}-${item.y}-${item.width}-${item.height}`}-${idx}`}
+        onClick={() => {
+          // AI rows are read-only; don’t enter edit mode for them
+          if (isAI) return;
+          setSelectedIdx(item.humanIndex ?? null);
+          setNotes(item?.comment ?? "");
+        }}
+        style={{
+          textAlign: "left",
+          padding: "10px 12px",
+          borderRadius: 10,
+          border: `1px solid ${isSelected ? ui.primary : ui.border}`,
+          background: isAI ? "#fff7ed" : (isSelected ? "#eef2ff" : "#f3f4f6"),
+          fontWeight: 800,
+          color: "#111827",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          cursor: isAI ? "default" : "pointer",
+          opacity: isAI ? 0.95 : 1,
+        }}
+        title={isAI ? "AI result (read-only)" : "Select to edit notes"}
+        disabled={isAI} // prevent focus/press styles for AI rows
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div>
+            <span
+              style={{
+                display: "inline-block",
+                padding: "4px 10px",
+                borderRadius: 999,
+                background: isAI ? "#fde68a" : "#fee2e2",
+                color: isAI ? "#92400e" : "#b91c1c",
+                fontWeight: 900,
+                minWidth: 64,
+                textAlign: "center",
+                marginRight: 8,
+              }}
+            >
+              {`Error ${idx + 1}`}
+            </span>
+            <span style={{ color: "#334155", fontWeight: 800 }}>
+              {when} – {who}
+            </span>
+          </div>
+
+          <div style={{ flex: 1, marginLeft: 10 }}>
+            {item.comment ? (
+              <span style={{ color: "#1e293b", fontWeight: 500 }}>{item.comment}</span>
+            ) : (
+              <span style={{ color: ui.text, fontWeight: 500 }}>
+                {isAI ? " " : "No notes"}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  })}
+</div>
+
 
   <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 8 }}>Notes</div>
   <textarea
