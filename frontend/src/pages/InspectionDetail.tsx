@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getUser } from "../auth"; // adjust path if needed
 import type { ZoomHandle } from "../types/models";
 import { ZoomableImage } from "../components/ZoomableImage";
-import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition, AnomalyMeta } from "../types/models";
+import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition, AnomalyMeta, AnomalyOrigin } from "../types/models";
 import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly, createImageAnomaly } from "../api/Inspections";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
@@ -60,36 +60,88 @@ export default function InspectionDetail() {
   const [draftNew, setDraftNew] = useState<AnomalyMeta | null>(null);
   const [creatingBusy, setCreatingBusy] = useState(false);
 
+const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+const [notes, setNotes] = useState<string>("");
+
+  // async function saveEditsForIndex(idx: number) {
+  //   if (!maintMeta?.id) return;
+  //   const all = (maintMeta.anomalies ?? []).map(a => ({
+  //     id: a.id,
+  //     x: a.x, y: a.y, width: a.width, height: a.height,
+  //     label: a.label, score: a.score, size: a.size,
+  //   }));
+
+  //   if (!all[idx]) return;
+
+  //   try {
+  //     setSavingIdx(idx);
+  //     setSaveError(null);
+  //     setSaveSuccess(null);
+
+  //     const updated = await saveImageAnomalies({
+  //       ownerInspectionId: numericInspectionId,
+  //       imageId: maintMeta.id,
+  //       anomalies: all,
+  //     });
+
+  //     if (updated) setMaintMeta(updated); // if API returns fresh ImageMeta
+  //     setSaveSuccess(`Anomaly #${idx + 1} saved.`);
+  //   } catch (e: any) {
+  //     setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
+  //   } finally {
+  //     setSavingIdx(null);
+  //   }
+  // }
 
   async function saveEditsForIndex(idx: number) {
-    if (!maintMeta?.id) return;
-    const all = (maintMeta.anomalies ?? []).map(a => ({
-      id: a.id,
-      x: a.x, y: a.y, width: a.width, height: a.height,
-      label: a.label, score: a.score, size: a.size,
-    }));
+  if (!maintMeta?.id) return;
 
-    if (!all[idx]) return;
 
-    try {
-      setSavingIdx(idx);
-      setSaveError(null);
-      setSaveSuccess(null);
+  const all = (maintMeta.anomalies ?? []).map((a, i) => ({
+   // do NOT force nulls; leave optional fields undefined
+   ...(a.id != null ? { id: a.id } : {}),
+   x: Math.round(a.x),
+   y: Math.round(a.y),
+   width: Math.round(a.width),
+   height: Math.round(a.height),
+  //  ...(a.label !== undefined ? { label: a.label } : {}),
+  ...(a.label !== undefined ? { label: normalizeLabel(a.label) || undefined } : {}),
+   ...(a.score !== undefined ? { score: a.score } : {}),
+   ...(a.size  !== undefined ? { size:  a.size  } : {}),
+   ...(i === idx
+       ? (notes.trim() ? { comment: notes } : {})               // set or omit
+       : (a.comment !== undefined ? { comment: a.comment } : {})),
+   ...(a.origin ? { origin: a.origin } : { origin: (a.id ? "USER_EDITED" : "USER_ADDED") as AnomalyOrigin }),
+ }));
 
-      const updated = await saveImageAnomalies({
-        ownerInspectionId: numericInspectionId,
-        imageId: maintMeta.id,
-        anomalies: all,
-      });
+  if (!all[idx]) return;
 
-      if (updated) setMaintMeta(updated); // if API returns fresh ImageMeta
-      setSaveSuccess(`Anomaly #${idx + 1} saved.`);
-    } catch (e: any) {
-      setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
-    } finally {
-      setSavingIdx(null);
+  try {
+    setSavingIdx(idx);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    const updated = await saveImageAnomalies({
+      ownerInspectionId: numericInspectionId,
+      imageId: maintMeta.id,
+      anomalies: all,
+    });
+
+    if (updated) {
+      setMaintMeta(updated);
+      // keep selection and notes aligned with server response
+      setSelectedIdx(idx);
+      setNotes(updated.anomalies?.[idx]?.comment ?? "");
     }
+    setSaveSuccess(`Anomaly #${idx + 1} saved.`);
+  } catch (e: any) {
+    setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
+  } finally {
+    setSavingIdx(null);
   }
+}
+
+
 
   async function deleteAnomalyAtIndex(idx: number) {
     if (!maintMeta?.id) return;
@@ -140,6 +192,13 @@ export default function InspectionDetail() {
       setDeletingIdx(null);
     }
   }
+
+  useEffect(() => {
+  if (selectedIdx == null) return;
+  const a = maintMeta?.anomalies?.[selectedIdx];
+  setNotes(a?.comment ?? "");
+}, [maintMeta?.anomalies, selectedIdx]);
+
 
   /* ----- Load inspection header ----- */
   useEffect(() => {
@@ -249,6 +308,17 @@ export default function InspectionDetail() {
   }, [numericInspectionId, transformerId]);
 
   /* ----- Helpers: view/delete/upload ----- */
+
+
+  function editorName(a?: AnomalyMeta): string {
+  if (!a) return "-";
+  if (a.origin === "AI_GENERATED" || a.lastEditedBy == null) return "AI Generated";
+  const me = getUser(); // assume { id, name } or similar
+  if (me && a.lastEditedBy === me.id && me.username) return me.username;
+  return `User #${a.lastEditedBy}`;
+}
+
+
   function goBack() {
     if (window.history.length > 1) navigate(-1);
     else navigate("/transformers");
@@ -468,6 +538,57 @@ export default function InspectionDetail() {
       setSaving(false);
     }
   }, [inspection, numericInspectionId, temperature]);
+
+  // top of InspectionDetail.tsx (near constants)
+const CANON_LABELS = [
+  "Loose Joint (Faulty)",
+  "Loose Joint (Potential)",
+  "Point Overload (Faulty)",
+  "Point Overload (Potential)",
+  "Full Wire Overload",
+] as const;
+
+type CanonLabel = typeof CANON_LABELS[number];
+
+// turn anything like "Point Overload Faulty" -> "Point Overload (Faulty)"
+function normalizeLabel(input?: string | null): CanonLabel | "" {
+  if (!input) return "";
+  const s = input.trim().toLowerCase();
+
+  // direct matches first
+  for (const c of CANON_LABELS) if (c.toLowerCase() === s) return c;
+
+  // legacy/synonyms without parentheses
+  if (s === "loose joint faulty") return "Loose Joint (Faulty)";
+  if (s === "loose joint potential") return "Loose Joint (Potential)";
+  if (s === "point overload faulty") return "Point Overload (Faulty)";
+  if (s === "point overload potential") return "Point Overload (Potential)";
+  if (s === "full wire overload") return "Full Wire Overload";
+
+  // very light fuzzy (strip punctuation/space)
+  const key = s.replace(/[^a-z0-9]/g, "");
+  const table: Record<string, CanonLabel> = {
+    loosejointfaulty: "Loose Joint (Faulty)",
+    loosejointpotential: "Loose Joint (Potential)",
+    pointoverloadfaulty: "Point Overload (Faulty)",
+    pointoverloadpotential: "Point Overload (Potential)",
+    fullwireoverload: "Full Wire Overload",
+  };
+  return table[key] ?? "";
+}
+
+
+function updateAnomalyLabelAt(i: number, label: string) {
+  setMaintMeta(m => {
+    if (!m) return m;
+    const arr = [...(m.anomalies ?? [])];
+    if (!arr[i]) return m;
+    // arr[i] = { ...arr[i], label, origin: arr[i].origin ?? (arr[i].id ? "USER_EDITED" : "USER_ADDED") };
+    const canon = normalizeLabel(label) || undefined;
+    arr[i] = { ...arr[i], label: canon, origin: arr[i].origin ?? (arr[i].id ? "USER_EDITED" : "USER_ADDED") };
+    return { ...m, anomalies: arr };
+  });
+}
 
   /* ----- Render ----- */
   return (
@@ -804,13 +925,34 @@ export default function InspectionDetail() {
                   {baselineAnomalies.length > 0 && (
                     <AnomalyLegend title="Baseline anomalies" items={baselineAnomalies} />
                   )}
+                  
 
                   {maintAnomalies.length > 0 && (
                     <AnomalyLegend
                       title="Current anomalies"
                       items={maintAnomalies}
                       rightRenderer={(_, i) => (
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                           <select
+                            //  value={item.label ?? ""}
+                             value={normalizeLabel(maintMeta?.anomalies?.[i]?.label)}
+                             onChange={(e) => updateAnomalyLabelAt(i, e.target.value)}
+                             style={{
+                               padding: "4px 1px",
+                               borderRadius: 10,
+                               border: `1px solid ${ui.border}`,
+                               fontWeight: 800,
+                               minWidth: 1,
+                             }}
+                             title="Set anomaly type"
+                           >
+                             <option value="" disabled>
+                               Select anomaly type…
+                             </option>
+                             {CANON_LABELS.map(opt => (
+                               <option key={opt} value={opt}>{opt}</option>
+                             ))}
+                           </select>
                           <button
                             onClick={() => saveEditsForIndex(i)}
                             disabled={savingIdx === i || deletingIdx === i}
@@ -899,8 +1041,15 @@ export default function InspectionDetail() {
                     onClick={() => {
                       setAddMode((v) => {
                         const nv = !v;
-                        if (!nv) setDraftNew(null);
-                        return nv;
+                        if (nv) {
+                             // Entering add mode: clear selection and notes
+                             setSelectedIdx(null);
+                             setNotes("");
+                           } else {
+                             // Leaving add mode
+                             setDraftNew(null);
+                           }
+                            return nv;
                       });
                     }}
                     disabled={!hasMaint || creatingBusy}
@@ -914,6 +1063,12 @@ export default function InspectionDetail() {
                     onClick={async () => {
                       if (!maintMeta?.id || !draftNew) return;
                       try {
+                        const nextDraft: AnomalyMeta = {
+                          ...draftNew,
+                          // Do NOT copy the current notes; user can add notes after selecting the new row
+                          origin: "USER_ADDED",
+                        };
+
                         setCreatingBusy(true);
                         setSaveError(null); setSaveSuccess(null);
 
@@ -923,18 +1078,24 @@ export default function InspectionDetail() {
                           updated = await createImageAnomaly({
                             ownerInspectionId: numericInspectionId,
                             imageId: maintMeta.id,
-                            anomaly: draftNew,
+                            anomaly: nextDraft,
                           });
                         } catch {
-                          const next = [...(maintMeta.anomalies ?? []), draftNew].map(a => ({
-                            id: a.id, x: a.x, y: a.y, width: a.width, height: a.height,
-                            label: a.label, score: a.score, size: a.size,
-                          }));
-                          updated = await saveImageAnomalies({
-                            ownerInspectionId: numericInspectionId,
-                            imageId: maintMeta.id,
-                            anomalies: next,
-                          });
+                            const next = [...(maintMeta.anomalies ?? []), nextDraft].map(a => ({
+                              ...(a.id != null ? { id: a.id } : {}),
+                              x: Math.round(a.x), y: Math.round(a.y),
+                              width: Math.round(a.width), height: Math.round(a.height),
+                              ...(a.label !== undefined ? { label: a.label } : {}),
+                              ...(a.score !== undefined ? { score: a.score } : {}),
+                              ...(a.size  !== undefined ? { size:  a.size  } : {}),
+                              ...(a.comment !== undefined && a.comment !== "" ? { comment: a.comment } : {}),
+                              origin: (a.origin ?? "USER_ADDED") as AnomalyOrigin,
+                            }));
+                                  updated = await saveImageAnomalies({
+                                    ownerInspectionId: numericInspectionId,
+                                    imageId: maintMeta.id,
+                                    anomalies: next,
+                                  });
                         }
 
                         if (updated) setMaintMeta(updated);
@@ -963,7 +1124,149 @@ export default function InspectionDetail() {
                   </button>
 
                 </div>
+
               </div>
+
+                              {/* === Errors & Notes Panel === */}
+<div
+  style={{
+    marginTop: 16,
+    background: ui.card,
+    border: `2px solid ${ui.border}`,
+    borderRadius: 16,
+    boxShadow: ui.shadow,
+    padding: 16,
+  }}
+>
+  <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>Errors</div>
+
+  <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+    {(maintMeta?.anomalies ?? []).map((a, i) => {
+      const who = editorName(a);
+      const when = a?.lastEditedAt
+        ? new Date(a.lastEditedAt).toLocaleString()
+        : (maintMeta?.uploadedAt ? new Date(maintMeta.uploadedAt).toLocaleString() : "-");
+      const selected = selectedIdx === i;
+      return (
+        <button
+          key={i}
+          onClick={() => {
+            setSelectedIdx(i);
+            setNotes(a?.comment ?? "");
+          }}
+          style={{
+            textAlign: "left",
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: `1px solid ${selected ? ui.primary : ui.border}`,
+            background: selected ? "#eef2ff" : "#f3f4f6",
+            fontWeight: 800,
+            color: "#111827",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+          title="Select to edit notes"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div>
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  fontWeight: 900,
+                  minWidth: 64,
+                  textAlign: "center",
+                }}
+              >
+                {`Error ${i + 1}`}
+              </span>
+              <span style={{ color: "#334155", fontWeight: 800 }}>
+                {when} – {who}
+              </span>
+            </div>
+            <div style={{ flex: 1, marginLeft: 10 }}>
+              {a.comment ? (
+                <span style={{ color: "#1e293b", fontWeight: 500 }}>{a.comment}</span>
+              ) : (
+                <span style={{ color: ui.text, fontWeight: 500 }}>No notes</span>
+              )}
+            </div>
+
+          </div>
+
+        </button>
+      );
+    })}
+    {!(maintMeta?.anomalies?.length) && (
+      <div style={{ color: ui.sub, fontWeight: 700 }}>No anomalies yet.</div>
+    )}
+  </div>
+
+  <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 8 }}>Notes</div>
+  <textarea
+    placeholder="Type here to add notes…"
+    // value={notes}
+    onChange={(e) => setNotes(e.target.value)}
+    disabled={selectedIdx == null}
+    style={{
+      width: "100%",
+      minHeight: 120,
+      resize: "vertical",
+      padding: "12px",
+      borderRadius: 12,
+      border: `1px solid ${ui.border}`,
+      outline: "none",
+      fontWeight: 700,
+      color: "#334155",
+      background: selectedIdx == null ? "#f8fafc" : "#fff",
+    }}
+  />
+
+  <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+    <button
+      onClick={() => {
+        if (selectedIdx == null) return;
+        saveEditsForIndex(selectedIdx);
+      }}
+      disabled={selectedIdx == null || savingIdx != null}
+      style={{
+        padding: "10px 16px",
+        borderRadius: 12,
+        border: 0,
+        background: ui.primary,
+        color: "#fff",
+        fontWeight: 900,
+        cursor: selectedIdx == null ? "not-allowed" : "pointer",
+        boxShadow: "0 10px 25px rgba(63,81,181,.25)",
+      }}
+    >
+      Confirm
+    </button>
+    <button
+      onClick={() => {
+        if (selectedIdx == null) return;
+        const a = maintMeta?.anomalies?.[selectedIdx];
+        setNotes(a?.comment ?? "");
+      }}
+      style={{
+        padding: "10px 16px",
+        borderRadius: 12,
+        border: `1px solid ${ui.border}`,
+        background: "#fff",
+        fontWeight: 900,
+        color: "#334155",
+      }}
+    >
+      Cancel
+    </button>
+  </div>
+</div>
+              
+
             </>
           ) : (
             <div style={{ color: ui.sub, fontWeight: 700 }}>

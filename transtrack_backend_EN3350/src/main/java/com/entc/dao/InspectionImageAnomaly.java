@@ -2,7 +2,7 @@ package com.entc.dao;
 
 import jakarta.persistence.*;
 import lombok.*;
-import com.entc.dao.AnomalyType;
+// import com.entc.dao.AnomalyType;
 import java.time.LocalDateTime;
 
 
@@ -30,6 +30,7 @@ public class InspectionImageAnomaly {
     @Column(name = "size")
     private Double size;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "anomaly_type", nullable = false)
     private AnomalyType origin = AnomalyType.AI_GENERATED;

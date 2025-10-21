@@ -25,6 +25,7 @@ export type ImageMeta = {
   uploader?: string;
   condition?: Condition;
   anomalies?: AnomalyMeta[];
+  aiAnomalies?: AnomalyMeta[];
 };
 
 export type TransformerHeader = {
@@ -42,6 +43,8 @@ export type ZoomHandle = {
   resetView: () => void;
 };
 
+export type AnomalyOrigin = "AI_GENERATED" | "USER_ADDED" | "USER_EDITED";
+
 export type AnomalyMeta = {
   id?: number;
   x: number;
@@ -51,6 +54,10 @@ export type AnomalyMeta = {
   label?: string;
   score?: number;
   size?: number;
+  comment?: string;
+  origin?: AnomalyOrigin;     
+  lastEditedAt?: string;     
+  lastEditedBy?: number;     
 };
 
 export type RenderAnomalyBox = {
