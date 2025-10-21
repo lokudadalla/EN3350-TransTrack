@@ -7,6 +7,8 @@ import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Co
 import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly, createImageAnomaly } from "../api/Inspections";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
+import DownloadImage from "../components/DownloadImages";
+import { CANON_LABELS, normalizeLabel, sameBox, editorName } from "../utils/anomalies";
 
 // moved out
 import { ui, pill, Chip, iconBtn, zoomBtnStyle } from "../ui/ui";
@@ -63,35 +65,6 @@ export default function InspectionDetail() {
 const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 const [notes, setNotes] = useState<string>("");
 
-  // async function saveEditsForIndex(idx: number) {
-  //   if (!maintMeta?.id) return;
-  //   const all = (maintMeta.anomalies ?? []).map(a => ({
-  //     id: a.id,
-  //     x: a.x, y: a.y, width: a.width, height: a.height,
-  //     label: a.label, score: a.score, size: a.size,
-  //   }));
-
-  //   if (!all[idx]) return;
-
-  //   try {
-  //     setSavingIdx(idx);
-  //     setSaveError(null);
-  //     setSaveSuccess(null);
-
-  //     const updated = await saveImageAnomalies({
-  //       ownerInspectionId: numericInspectionId,
-  //       imageId: maintMeta.id,
-  //       anomalies: all,
-  //     });
-
-  //     if (updated) setMaintMeta(updated); // if API returns fresh ImageMeta
-  //     setSaveSuccess(`Anomaly #${idx + 1} saved.`);
-  //   } catch (e: any) {
-  //     setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
-  //   } finally {
-  //     setSavingIdx(null);
-  //   }
-  // }
 
   async function saveEditsForIndex(idx: number) {
   if (!maintMeta?.id) return;
@@ -111,7 +84,7 @@ const [notes, setNotes] = useState<string>("");
    ...(i === idx
        ? (notes.trim() ? { comment: notes } : {})               // set or omit
        : (a.comment !== undefined ? { comment: a.comment } : {})),
-   origin: "USER_EDITED" as AnomalyOrigin,
+   origin: a.origin === "USER_ADDED" ? "USER_ADDED" : "USER_EDITED" as AnomalyOrigin,
  }));
 
   if (!all[idx]) return;
@@ -185,7 +158,7 @@ const [notes, setNotes] = useState<string>("");
         setMaintMeta(updated ?? (m => (m ? { ...m!, anomalies: next } : m)));
       }
 
-      setSaveSuccess(`Anomaly #${idx + 1} deleted.`);
+      setSaveSuccess(`Anomaly ${idx + 1} deleted.`);
     } catch (e: any) {
       setSaveError(e?.message ?? `Failed to delete anomaly #${idx + 1}`);
     } finally {
@@ -309,24 +282,6 @@ const [notes, setNotes] = useState<string>("");
 
   /* ----- Helpers: view/delete/upload ----- */
 
-  // put near other helpers
-function sameBox(a: AnomalyMeta, b: AnomalyMeta, tol = 2): boolean {
-  // Prefer id if both have one
-  if (typeof a.id === "number" && typeof b.id === "number" && a.id === b.id) return true;
-
-  const close = (p: number, q: number) => Math.abs(p - q) <= tol;
-  const labelSame =
-    (a.label ?? "").trim().toLowerCase() === (b.label ?? "").trim().toLowerCase();
-
-  return (
-    close(a.x, b.x) &&
-    close(a.y, b.y) &&
-    close(a.width, b.width) &&
-    close(a.height, b.height) &&
-    labelSame
-  );
-}
-
 type LogSource = "AI" | "USER";
 type LogItem = (AnomalyMeta & { source: LogSource; humanIndex?: number });
 
@@ -343,24 +298,6 @@ const mergedLogs = useMemo<LogItem[]>(() => {
 
   return [...ai, ...human]; // AI first
 }, [maintMeta]);
-
-
-
-//   function editorName(a?: AnomalyMeta): string {
-//   if (!a) return "-";
-//   if (a.origin === "AI_GENERATED" || a.lastEditedBy == null) return "AI Generated";
-//   const me = getUser(); // assume { id, name } or similar
-//   if (me && a.lastEditedBy === me.id && me.username) return me.username;
-//   return `User #${a.lastEditedBy}`;
-// }
-
-function editorName(a?: AnomalyMeta): string {
-  if (!a) return "-";
-  if (a.origin === "AI_GENERATED" || a.lastEditedBy == null) return "AI Generated";
-  const me = getUser();
-  if (me && a.lastEditedBy === me.id && me.username) return me.username;
-  return `User #${a.lastEditedBy}`;
-}
 
 
   function goBack() {
@@ -583,43 +520,6 @@ function editorName(a?: AnomalyMeta): string {
     }
   }, [inspection, numericInspectionId, temperature]);
 
-  // top of InspectionDetail.tsx (near constants)
-const CANON_LABELS = [
-  "Loose Joint (Faulty)",
-  "Loose Joint (Potential)",
-  "Point Overload (Faulty)",
-  "Point Overload (Potential)",
-  "Full Wire Overload",
-] as const;
-
-type CanonLabel = typeof CANON_LABELS[number];
-
-// turn anything like "Point Overload Faulty" -> "Point Overload (Faulty)"
-function normalizeLabel(input?: string | null): CanonLabel | "" {
-  if (!input) return "";
-  const s = input.trim().toLowerCase();
-
-  // direct matches first
-  for (const c of CANON_LABELS) if (c.toLowerCase() === s) return c;
-
-  // legacy/synonyms without parentheses
-  if (s === "loose joint faulty") return "Loose Joint (Faulty)";
-  if (s === "loose joint potential") return "Loose Joint (Potential)";
-  if (s === "point overload faulty") return "Point Overload (Faulty)";
-  if (s === "point overload potential") return "Point Overload (Potential)";
-  if (s === "full wire overload") return "Full Wire Overload";
-
-  // very light fuzzy (strip punctuation/space)
-  const key = s.replace(/[^a-z0-9]/g, "");
-  const table: Record<string, CanonLabel> = {
-    loosejointfaulty: "Loose Joint (Faulty)",
-    loosejointpotential: "Loose Joint (Potential)",
-    pointoverloadfaulty: "Point Overload (Faulty)",
-    pointoverloadpotential: "Point Overload (Potential)",
-    fullwireoverload: "Full Wire Overload",
-  };
-  return table[key] ?? "";
-}
 
 
 function updateAnomalyLabelAt(i: number, label: string) {
@@ -1182,75 +1082,23 @@ function updateAnomalyLabelAt(i: number, label: string) {
     padding: 16,
   }}
 >
-  {/*<div style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>Errors</div>
 
-   <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-    {(maintMeta?.anomalies ?? []).map((a, i) => {
-      const who = editorName(a);
-      const when = a?.lastEditedAt
-        ? new Date(a.lastEditedAt).toLocaleString()
-        : (maintMeta?.uploadedAt ? new Date(maintMeta.uploadedAt).toLocaleString() : "-");
-      const selected = selectedIdx === i;
-      return (
-        <button
-          key={i}
-          onClick={() => {
-            setSelectedIdx(i);
-            setNotes(a?.comment ?? "");
-          }}
-          style={{
-            textAlign: "left",
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: `1px solid ${selected ? ui.primary : ui.border}`,
-            background: selected ? "#eef2ff" : "#f3f4f6",
-            fontWeight: 800,
-            color: "#111827",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-          }}
-          title="Select to edit notes"
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "4px 10px",
-                  borderRadius: 999,
-                  background: "#fee2e2",
-                  color: "#b91c1c",
-                  fontWeight: 900,
-                  minWidth: 64,
-                  textAlign: "center",
-                }}
-              >
-                {`Error ${i + 1}`}
-              </span>
-              <span style={{ color: "#334155", fontWeight: 800 }}>
-                {when} – {who}
-              </span>
-            </div>
-            <div style={{ flex: 1, marginLeft: 10 }}>
-              {a.comment ? (
-                <span style={{ color: "#1e293b", fontWeight: 500 }}>{a.comment}</span>
-              ) : (
-                <span style={{ color: ui.text, fontWeight: 500 }}>No notes</span>
-              )}
-            </div>
+  <div style={{
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 12
+}}>
+  <div style={{ fontSize: 18, fontWeight: 900 }}>Errors</div>
+  <DownloadImage
+    maintMeta={maintMeta}
+    transformerNo={header.transformerNo}
+    inspectionId={inspectionNo ?? numericInspectionId}
+    buttonClassName="" 
+    style={{ display: "flex", gap: 8 }}
+  />
+</div>
 
-          </div>
-
-        </button>
-      );
-    })}
-    {!(maintMeta?.anomalies?.length) && (
-      <div style={{ color: ui.sub, fontWeight: 700 }}>No anomalies yet.</div>
-    )}
-  </div> */}
-
-  <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>Errors</div>
 
 <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
   {mergedLogs.map((item, idx) => {
