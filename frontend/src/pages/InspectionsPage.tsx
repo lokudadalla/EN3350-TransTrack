@@ -462,6 +462,65 @@ export default function InspectionsPage() {
     }
   }
 
+  // Copies the most-recent BASELINE image found for a transformer to a target inspection.
+// No-ops if none exists.
+async function copyLatestBaselineToInspection(targetInspectionId: number, transformerNo: string) {
+  // 1) find the latest baseline across all inspections of this transformer
+  const insList = await InspectionsAPI.listByTransformerNo(transformerNo);
+  // newest first (by date+time, then createdAt if needed)
+  insList.sort((a, b) => {
+    const at = new Date(`${a.inspectionDate}T${a.inspectionTime}`).getTime() || new Date(a.createdAt).getTime();
+    const bt = new Date(`${b.inspectionDate}T${b.inspectionTime}`).getTime() || new Date(b.createdAt).getTime();
+    return bt - at;
+  });
+
+  let latest: ImageMeta | null = null;
+  let latestOwner: number | null = null;
+
+  for (const it of insList) {
+    const r = await fetch(api(`/inspections/${it.inspectionNo}/images?type=BASELINE`), {
+      headers: { ...authHeaders() },
+    });
+    if (!r.ok) continue;
+    const arr: ImageMeta[] = await r.json();
+    if (!arr?.length) continue;
+    // newest uploaded baseline within this inspection
+    const newest = arr.slice().sort((x, y) =>
+      new Date(y.uploadedAt).getTime() - new Date(x.uploadedAt).getTime()
+    )[0];
+    if (!latest || new Date(newest.uploadedAt).getTime() > new Date(latest.uploadedAt).getTime()) {
+      latest = newest;
+      latestOwner = it.inspectionNo;
+    }
+  }
+
+  if (!latest || !latestOwner) return; // nothing to copy
+
+  // 2) fetch the binary (use your resolver to get a URL the browser can fetch)
+  const url = await new Promise<string>((resolve) =>
+    resolveImageUrl(latestOwner!, latest!, resolve)
+  );
+  const bin = await fetch(url, { headers: { ...authHeaders() } }).then(r => r.blob());
+  const fileLike = new File([bin], latest.fileName || "baseline.jpg", { type: bin.type || "image/jpeg" });
+
+  // 3) upload it to the new inspection as BASELINE
+  const urlObj = new URL(api(`/inspections/${targetInspectionId}/images`));
+  urlObj.searchParams.set("type", "BASELINE");
+  urlObj.searchParams.set("uploader", "web");
+  // if you want to carry condition forward, use latest.condition ?? "SUNNY"
+  urlObj.searchParams.set("condition", (latest as any)?.condition ?? "SUNNY");
+
+  const fd = new FormData();
+  fd.append("files", fileLike);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", urlObj.toString(), true);
+  const u = getUser();
+  if (u && Number.isFinite(u.id)) xhr.setRequestHeader("X-User-Id", String(u.id));
+  xhr.send(fd);
+}
+
+
   // add inspection
   async function addInspection(e: React.FormEvent) {
     e.preventDefault();
@@ -476,6 +535,9 @@ export default function InspectionsPage() {
         inspectionDate,
         inspectionTime,
       });
+      // after you set state with `created`
+      copyLatestBaselineToInspection(created.inspectionNo, transformerId);
+
       const row = mapDTOtoUI(created);
       setInspections((prev) => [row, ...prev]);
       setOwnedInspectionIds((prev) => [created.inspectionNo, ...prev]);
@@ -546,19 +608,6 @@ export default function InspectionsPage() {
     try {
       if (!confirm("Delete this inspection?")) return;
       const id = Number(row.inspectionNo);
-
-      const types: ImageType[] = ["BASELINE", "MAINTENANCE"];
-      for (const t of types) {
-        const r = await fetch(api(`/inspections/${id}/images?type=${t}`));
-        if (r.ok) {
-          const imgs: ImageMeta[] = await r.json();
-          await Promise.all(
-            (imgs || []).map((m) =>
-              fetch(api(`/inspections/${id}/images/${m.id}`), { method: "DELETE" })
-            )
-          );
-        }
-      }
 
       await InspectionsAPI.remove(id);
       setInspections((prev) => prev.filter((r) => r.inspectionNo !== row.inspectionNo));

@@ -166,41 +166,7 @@ const finishResize = useCallback(() => {
     setRenderBoxes([]);
     return;
   }
-  // if (!list.length || !containerRef.current || !imageRef.current) {
-  //   setRenderBoxes([]);
-  //   mappingRef.current = null;
-  //   return;
-  // }
-
-  // const naturalWidth = imageRef.current.naturalWidth;
-  // const naturalHeight = imageRef.current.naturalHeight;
-  // if (!naturalWidth || !naturalHeight) { setRenderBoxes([]); mappingRef.current = null; return; }
-
-  // const containerWidth = containerRef.current.offsetWidth;
-  // const containerHeight = containerRef.current.offsetHeight;
-  // if (!containerWidth || !containerHeight) { setRenderBoxes([]); mappingRef.current = null; return; }
-
-  // const imageAspect = naturalWidth / naturalHeight;
-  // const containerAspect = containerWidth / containerHeight;
-  // let displayWidth = containerWidth;
-  // let displayHeight = containerHeight;
-  // if (imageAspect > containerAspect) {
-  //   displayHeight = displayWidth / imageAspect;
-  // } else {
-  //   displayWidth = displayHeight * imageAspect;
-  // }
-
-  // const offsetX = (containerWidth - displayWidth) / 2;
-  // const offsetY = (containerHeight - displayHeight) / 2;
-  // const scaleX = displayWidth / naturalWidth;
-  // const scaleY = displayHeight / naturalHeight;
-
-  // mappingRef.current = {
-  //   naturalWidth, naturalHeight,
-  //   displayWidth, displayHeight,
-  //   containerWidth, containerHeight,
-  //   offsetX, offsetY, scaleX, scaleY,
-  // };
+  
 
   const mapped: RenderAnomalyBox[] = list
     .map((anomaly, idx) => {

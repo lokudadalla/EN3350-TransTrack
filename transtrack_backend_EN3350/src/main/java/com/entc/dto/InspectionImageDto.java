@@ -28,6 +28,7 @@ public class InspectionImageDto {
 
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     public static class AnomalyDto {
         private Long id;
         private int x, y, width, height;
@@ -60,6 +61,7 @@ public class InspectionImageDto {
         List<AnomalyDto> aiSnap = List.of();
         try {
             if (i.getAiAnomaliesJson() != null && !i.getAiAnomaliesJson().isBlank()) {
+                System.out.println("Parsing AI anomalies JSON: " + i.getAiAnomaliesJson());
                 aiSnap = mapper.readValue(
                     i.getAiAnomaliesJson(),
                     mapper.getTypeFactory().constructCollectionType(List.class, AnomalyDto.class)

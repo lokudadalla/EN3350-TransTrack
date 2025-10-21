@@ -3,6 +3,7 @@ package com.entc.repository;
 import com.entc.dao.ImageType;
 import com.entc.dao.InspectionImage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -79,4 +80,11 @@ public interface InspectionImageRepository extends JpaRepository<InspectionImage
            where i.id = :id
            """)
     Optional<InspectionImage> findOneWithAnomalies(@Param("id") Long id);
+
+    @Query("select i.id from InspectionImage i where i.inspection.inspectionNo = :inspectionNo")
+    List<Long> findIdsByInspection(@Param("inspectionNo") Long inspectionNo);
+
+    @Modifying
+    @Query("delete from InspectionImage i where i.inspection.inspectionNo = :inspectionNo")
+    void deleteAllByInspection(@Param("inspectionNo") Long inspectionNo);
 }
