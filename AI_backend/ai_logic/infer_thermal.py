@@ -1,20 +1,21 @@
 from ultralytics import YOLO
 from pathlib import Path
-import numpy as np, cv2, json, tempfile
+import numpy as np, cv2, json
 from math import exp
+from typing import Optional, Dict
 
 def infer_thermal(
     candidate_img: str,
     weights: str,
     cfg_path: str,
-    baseline_img: str | None = None,
-    save_annot: str | None = None,
+    baseline_img: Optional[str] = None,
+    save_annot: Optional[str] = None,
     device: int = 0,
     imgsz: int = 640,
     web_payload: bool = False,
     half: bool = True,
-    cfg_overrides: dict | None = None,
-    temperature_percent: int | None = None,   # <-- slider 0..100
+    cfg_overrides: Optional[Dict] = None,
+    temperature_percent: Optional[int] = None,   # slider 0..100
 ):
     # ------------------- config (with optional overrides) -------------------
     CFG = json.load(open(cfg_path, "r"))
@@ -36,17 +37,12 @@ def infer_thermal(
             d = d[k]
         return d
 
-    # --- slider weight (0..1) for anomaly score blending ---
-    if temperature_percent is None:
-        t = 0.0
-    else:
-        p = max(0, min(100, int(temperature_percent)))
-        t = p / 100.0
-
+    # --- slider weight (0..1) for temperature gate + blended score ---
+    t = 0.0 if temperature_percent is None else max(0, min(100, int(temperature_percent))) / 100.0
     base_gate = cfgv("temperature.base_gate", 0.0)   # gate at t=0
     max_gate  = cfgv("temperature.max_gate", 0.60)   # gate at t=1
     gate = base_gate + t * (max_gate - base_gate)
-    
+
     # ------------------------ utils ------------------------
     def load_rgb(path):
         bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
@@ -98,10 +94,7 @@ def infer_thermal(
         warm_s = sC >= cfgv("color.sat_min", 0.35)
         warm_v = vC_roi >= cfgv("color.val_min", 0.50)
 
-        if vB is None:
-            vB_roi = np.zeros_like(vC_roi)
-        else:
-            vB_roi = vB[y:y+h, x:x+w]
+        vB_roi = np.zeros_like(vC_roi) if vB is None else vB[y:y+h, x:x+w]
         med_base = cv2.medianBlur((vB_roi*255).astype(np.uint8), 31)/255.0
         med_cand = cv2.medianBlur((vC_roi*255).astype(np.uint8), 31)/255.0
         dv = (vC_roi - med_base)
@@ -266,32 +259,28 @@ def infer_thermal(
     has_pot    = any(b["finalClass"] in POT for b in refined)
     grade = "faulty" if has_faulty else ("potentially faulty" if has_pot else "normal")
 
-    # legacy image score (kept for full payload)
     weights_for_score = {**{k:1.0 for k in FAULTY}, **{k:0.7 for k in POT}}
     legacy_image_score = max((weights_for_score[b["finalClass"]]*b["detConfidence"] for b in refined), default=0.0)
 
     full_result = {
         "image": str(candidate_img),
         "grade": grade,
-        "anomaly_score": float(legacy_image_score),  # full payload only
+        "anomaly_score": float(legacy_image_score),
         "boxes": refined,
         "rule_prob": float(rule_prob),
     }
 
     # ------------------- web payload (slider-aware per-box score) -------------------
-    H, W = cand_raw.shape[:2]
     web_boxes = []
-
     for b in refined:
         det_conf = float(b["detConfidence"])
-        # Thermal strength reacts to your rules & thresholds:
-        rule_strength = 1.0 if b["isHot"] else float(b["areaFrac"])
+        rule_strength = 1.0 if b["isHot"] else float(b["areaFrac"])  # reacts to thresholds
 
-        # NEW: drop boxes that don't meet the temperature gate
+        # Temperature gate (drop weak-thermal boxes as slider increases)
         if rule_strength < gate:
             continue
 
-        # Blended per-box score (what your frontend shows)
+        # Blended per-box score shown to frontend
         per_box_score = (1.0 - t) * det_conf + t * rule_strength
         per_box_score = max(0.0, min(1.0, per_box_score))
 
