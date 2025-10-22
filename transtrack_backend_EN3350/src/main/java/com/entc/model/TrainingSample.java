@@ -14,7 +14,7 @@ public class TrainingSample {
     @Column(nullable = false)
     private Long imageId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 1024)   // allow long absolute paths
     private String imagePath;
 
     @Lob
@@ -26,6 +26,11 @@ public class TrainingSample {
 
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
+
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 
     // ---------- Getters and Setters ----------
     public Long getId() {
