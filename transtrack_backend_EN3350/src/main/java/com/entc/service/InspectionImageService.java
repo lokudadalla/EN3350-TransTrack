@@ -29,6 +29,7 @@ public class InspectionImageService {
     private final InspectionImageRepository imageRepo;
     private final InspectionImageAnomalyRepository anomalyRepo;
     private final StorageService storage;
+    private final PythonTrainingService pythonTrainingService;
     
 
     @Transactional
@@ -183,6 +184,13 @@ public class InspectionImageService {
                 anomalyRepo.delete(a);
             }
         }
+
+        var finalAnnotations = anomalyRepo.findByInspectionImage_Id(img.getId());
+        pythonTrainingService.bufferSample(
+                img.getId(),
+                img.getStoragePath(),   // or use getFilePath() if available
+                finalAnnotations
+        );
     
         return imageRepo.findOneWithAnomalies(img.getId()).orElse(img);
     }
