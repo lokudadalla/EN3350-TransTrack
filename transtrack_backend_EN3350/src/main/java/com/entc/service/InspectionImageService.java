@@ -186,12 +186,12 @@ public class InspectionImageService {
         }
 
         var finalAnnotations = anomalyRepo.findByInspectionImage_Id(img.getId());
-        pythonTrainingService.bufferSample(
-                img.getId(),
-                img.getStoragePath(),   // or use getFilePath() if available
-                finalAnnotations
-        );
-    
+        try {
+            // NEW signature — pass the entity + its anomalies
+            pythonTrainingService.bufferSample(img, finalAnnotations);
+        } catch (Exception ignore) {}
+
+        // Return fresh DTO source
         return imageRepo.findOneWithAnomalies(img.getId()).orElse(img);
     }
 
