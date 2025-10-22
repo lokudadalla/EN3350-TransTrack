@@ -44,13 +44,8 @@ function buildFeedbackLog(
   const ai_val = toDisplayAnomalies(maintMeta.aiAnomalies ?? []);
   const user = toDisplayAnomalies(maintMeta.anomalies ?? []);
 
-  // --- check if user has edited anomalies
-  const hasUserEdited = user.some(a => a.origin === "USER_EDITED");
-
-  // --- apply same rule as mergedLogs
-  const ai = hasUserEdited ? [] : ai_val;
-
-  const userOnly = user.filter(u => !ai.some(aiBox => sameBox(aiBox, u)));
+  const ai = ai_val;      // ← from maintMeta.aiAnomalies
+  const userOnly = user;  // ← from maintMeta.anomalies
   const file_name = maintMeta.fileName;
 
   return {
