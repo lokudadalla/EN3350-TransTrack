@@ -13,7 +13,7 @@ APP_PUBLIC_BASE = os.getenv("APP_PUBLIC_BASE", "http://localhost:8080")
 app = FastAPI(title="Transformer AI Backend")
 
 BASE_DIR     = Path(__file__).resolve().parent
-WEIGHTS_PATH = BASE_DIR / "ai_logic" / "best.pt"
+WEIGHTS_PATH = BASE_DIR / "ai_logic" / "best2.pt"
 CFG_PATH     = BASE_DIR / "ai_logic" / "cfg" / "config_global.json"
 
 
