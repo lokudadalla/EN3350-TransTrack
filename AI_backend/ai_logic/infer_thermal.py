@@ -1,15 +1,16 @@
 from ultralytics import YOLO
 from pathlib import Path
-import numpy as np, cv2, json, tempfile
+import numpy as np, cv2, json
 from math import exp
+from typing import Optional, Dict
 
 
 def infer_thermal(
     candidate_img: str,
     weights: str,
     cfg_path: str,
-    baseline_img: str | None = None,
-    save_annot: str | None = None,
+    baseline_img: Optional[str] = None,
+    save_annot: Optional[str] = None,
     device: int = 0,
     imgsz: int = 640,
     web_payload: bool = False,
@@ -316,25 +317,22 @@ def infer_thermal(
     full_result = {
         "image": str(candidate_img),
         "grade": grade,
-        "anomaly_score": float(legacy_image_score),  # full payload only
+        "anomaly_score": float(legacy_image_score),
         "boxes": refined,
         "rule_prob": float(rule_prob),
     }
 
     # ------------------- web payload (slider-aware per-box score) -------------------
-    H, W = cand_raw.shape[:2]
     web_boxes = []
-
     for b in refined:
         det_conf = float(b["detConfidence"])
-        # Thermal strength reacts to your rules & thresholds:
-        rule_strength = 1.0 if b["isHot"] else float(b["areaFrac"])
+        rule_strength = 1.0 if b["isHot"] else float(b["areaFrac"])  # reacts to thresholds
 
-        # NEW: drop boxes that don't meet the temperature gate
+        # Temperature gate (drop weak-thermal boxes as slider increases)
         if rule_strength < gate:
             continue
 
-        # Blended per-box score (what your frontend shows)
+        # Blended per-box score shown to frontend
         per_box_score = (1.0 - t) * det_conf + t * rule_strength
         per_box_score = max(0.0, min(1.0, per_box_score))
 
