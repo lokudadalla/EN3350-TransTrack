@@ -8,7 +8,7 @@ import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForTh
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
 import DownloadImage from "../components/DownloadImages";
-import { CANON_LABELS, normalizeLabel, sameBox, editorName } from "../utils/anomalies";
+import { CANON_LABELS, normalizeLabel, editorName } from "../utils/anomalies";
 
 // moved out
 import { ui, pill, Chip, iconBtn, zoomBtnStyle } from "../ui/ui";
@@ -66,28 +66,101 @@ const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 const [notes, setNotes] = useState<string>("");
 
 
-  async function saveEditsForIndex(idx: number) {
+//   async function saveEditsForIndex(idx: number) {
+//   if (!maintMeta?.id) return;
+
+
+//   const all = (maintMeta.anomalies ?? []).map((a, i) => ({
+//    // do NOT force nulls; leave optional fields undefined
+//    ...(a.id != null ? { id: a.id } : {}),
+//    x: Math.round(a.x),
+//    y: Math.round(a.y),
+//    width: Math.round(a.width),
+//    height: Math.round(a.height),
+//   //  ...(a.label !== undefined ? { label: a.label } : {}),
+//   ...(a.label !== undefined ? { label: normalizeLabel(a.label) || undefined } : {}),
+//    ...(a.score !== undefined ? { score: a.score } : {}),
+//    ...(a.size  !== undefined ? { size:  a.size  } : {}),
+//    ...(i === idx
+//        ? (notes.trim() ? { comment: notes } : {})               // set or omit
+//        : (a.comment !== undefined ? { comment: a.comment } : {})),
+//    origin: a.origin === "USER_ADDED" ? "USER_ADDED" : "USER_EDITED" as AnomalyOrigin,
+//  }));
+
+//   if (!all[idx]) return;
+
+//   try {
+//     setSavingIdx(idx);
+//     setSaveError(null);
+//     setSaveSuccess(null);
+
+//     const updated = await saveImageAnomalies({
+//       ownerInspectionId: numericInspectionId,
+//       imageId: maintMeta.id,
+//       anomalies: all,
+//     });
+
+//     if (updated) {
+//       setMaintMeta(updated);
+//       // keep selection and notes aligned with server response
+//       setSelectedIdx(idx);
+//       setNotes(updated.anomalies?.[idx]?.comment ?? "");
+//     }
+//     setSaveSuccess(`Anomaly ${idx + 1} saved.`);
+//   } catch (e: any) {
+//     setSaveError(e?.message ?? `Failed to save anomaly #${idx + 1}`);
+//   } finally {
+//     setSavingIdx(null);
+//   }
+// }
+
+
+async function saveEditsForIndex(idx: number) {
+  console.log("Saving edits for index:", idx);
   if (!maintMeta?.id) return;
 
+  const src = maintMeta.anomalies ?? [];
+  const target = src[idx];
+  if (!target) return;
 
-  const all = (maintMeta.anomalies ?? []).map((a, i) => ({
-   // do NOT force nulls; leave optional fields undefined
-   ...(a.id != null ? { id: a.id } : {}),
-   x: Math.round(a.x),
-   y: Math.round(a.y),
-   width: Math.round(a.width),
-   height: Math.round(a.height),
-  //  ...(a.label !== undefined ? { label: a.label } : {}),
-  ...(a.label !== undefined ? { label: normalizeLabel(a.label) || undefined } : {}),
-   ...(a.score !== undefined ? { score: a.score } : {}),
-   ...(a.size  !== undefined ? { size:  a.size  } : {}),
-   ...(i === idx
-       ? (notes.trim() ? { comment: notes } : {})               // set or omit
-       : (a.comment !== undefined ? { comment: a.comment } : {})),
-   origin: a.origin === "USER_ADDED" ? "USER_ADDED" : "USER_EDITED" as AnomalyOrigin,
- }));
+  // Build payload: preserve non-edited rows exactly; change only idx
+  const anomaliesPayload = src.map((a, i) => {
+    // keep the exact values for non-edited rows (no rounding, no renaming, no origin changes)
+    if (i !== idx) {
+      console.log("Preserving anomaly at index:", i);
+      console.log(`${JSON.stringify(a)}`);
+      return {
+        ...(a.id != null ? { id: a.id } : {}),
+        x: a.x, y: a.y, width: a.width, height: a.height,
+        ...(a.label !== undefined ? { label: a.label } : {}),
+        ...(a.score !== undefined ? { score: a.score } : {}),
+        ...(a.size  !== undefined ? { size:  a.size  } : {}),
+        ...(a.comment !== undefined ? { comment: a.comment } : {}),
+        ...(a.origin  ? { origin: a.origin as AnomalyOrigin } : {}),
+        ...(a.lastEditedAt ? { lastEditedAt: a.lastEditedAt } : {}),
+        ...(a.lastEditedBy ? { lastEditedBy: a.lastEditedBy } : {}),
+      };
+    }
+    console.log("Editing anomaly at index:", i);
 
-  if (!all[idx]) return;
+    // edited row: apply your changes
+    const edited: Partial<AnomalyMeta> = {
+      ...(a.id != null ? { id: a.id } : {}),
+      // if user resized/moved via UI, keep the current values as-is; don't round
+      x: a.x, y: a.y, width: a.width, height: a.height,
+      // normalize label only for the edited row
+      ...(a.label !== undefined ? { label: normalizeLabel(a.label) || undefined } : {}),
+      ...(a.score !== undefined ? { score: a.score } : {}),
+      ...(a.size  !== undefined ? { size:  a.size  } : {}),
+      // update comment only if the textarea has text; otherwise preserve existing
+      ...(notes.trim() !== "" ? { comment: notes } :
+         (a.comment !== undefined ? { comment: a.comment } : {})),
+      // only the edited row becomes USER_EDITED (unless it was USER_ADDED)
+      origin: a.origin === "USER_ADDED" ? "USER_ADDED" : "USER_EDITED",
+    };
+
+    return edited;
+  });
 
   try {
     setSavingIdx(idx);
@@ -97,12 +170,11 @@ const [notes, setNotes] = useState<string>("");
     const updated = await saveImageAnomalies({
       ownerInspectionId: numericInspectionId,
       imageId: maintMeta.id,
-      anomalies: all,
+      anomalies: anomaliesPayload,
     });
 
     if (updated) {
       setMaintMeta(updated);
-      // keep selection and notes aligned with server response
       setSelectedIdx(idx);
       setNotes(updated.anomalies?.[idx]?.comment ?? "");
     }
@@ -113,6 +185,7 @@ const [notes, setNotes] = useState<string>("");
     setSavingIdx(null);
   }
 }
+
 
 
 
@@ -286,17 +359,16 @@ type LogSource = "AI" | "USER";
 type LogItem = (AnomalyMeta & { source: LogSource; humanIndex?: number });
 
 const mergedLogs = useMemo<LogItem[]>(() => {
-  const ai = toDisplayAnomalies(maintMeta?.aiAnomalies).map(a => ({
-    ...a,
-    source: "AI" as const
-  }));
+  // const ai = toDisplayAnomalies(maintMeta?.aiAnomalies).map(a => ({
+  //   ...a,
+  //   source: "AI" as const
+  // }));
 
   const humanRaw = toDisplayAnomalies(maintMeta?.anomalies);
   const human = humanRaw
-    .map((a, idx) => ({ ...a, source: "USER" as const, humanIndex: idx }))
-    .filter(u => !ai.some(aiBox => sameBox(aiBox, u))); // de-dup against AI
+    .map((a, idx) => ({ ...a, source: "USER" as const, humanIndex: idx })); // de-dup against AI
 
-  return [...ai, ...human]; // AI first
+  return [...human]; // AI first
 }, [maintMeta]);
 
 
