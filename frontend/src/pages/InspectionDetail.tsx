@@ -740,7 +740,7 @@ function updateAnomalyLabelAt(i: number, label: string) {
         <div style={{ display: "flex", gap: 14, marginTop: 16, alignItems: "stretch", flexWrap: "wrap" }}>
           <Chip title="Transformer No" value={header.transformerNo} />
           <Chip title="Pole No" value={header.poleNo} />
-          <Chip title="Branch" value={header.branch} />
+          {/* <Chip title="Branch" value={header.branch} /> */}
         </div>
       </div>
 

@@ -29,6 +29,7 @@ public class InspectionImageService {
     private final InspectionImageRepository imageRepo;
     private final InspectionImageAnomalyRepository anomalyRepo;
     private final StorageService storage;
+    private final PythonTrainingService pythonTrainingService;
     
 
     @Transactional
@@ -102,40 +103,95 @@ public class InspectionImageService {
     @Transactional
     public InspectionImage replaceAnomalies(
             Long userId, Long inspectionId, Long imageId,
-            List<AnomalyUpsertDto> newAnomalies) throws IOException {
-
+            List<AnomalyUpsertDto> incoming) throws IOException {
+    
         var img = imageRepo.findByIdAndInspection_UserId(imageId, userId)
                 .filter(i -> i.getInspection().getInspectionNo().equals(inspectionId))
                 .orElseThrow(() -> new IOException("Image not found"));
-
-        anomalyRepo.deleteByInspectionImage_Id(img.getId());
-
-        if (newAnomalies != null && !newAnomalies.isEmpty()) {
-            var toSave = newAnomalies.stream().map(dto -> {
-                var a = new InspectionImageAnomaly();
-                a.setInspectionImage(img);
-                a.setX(dto.x());
-                a.setY(dto.y());
-                a.setWidth(dto.width());
-                a.setHeight(dto.height());
-                a.setLabel(dto.label());
-                a.setScore(dto.score());
-                a.setSize(dto.size());
-                a.setComment(dto.comment());
-
-                // default to AI_GENERATED if FE didn’t send origin
-                a.setOrigin(dto.origin() != null ? dto.origin() : AnomalyType.AI_GENERATED);
-
-                // latest editor stamp
-                a.setLastEditedAt(java.time.LocalDateTime.now());
-                a.setLastEditedBy(userId);
-
-                return a;
-            }).toList();
-
-            anomalyRepo.saveAll(toSave);
+    
+        // Load existing anomalies and index by id
+        var existing = anomalyRepo.findByInspectionImage_Id(img.getId());
+        var byId = existing.stream()
+                .collect(java.util.stream.Collectors.toMap(InspectionImageAnomaly::getId, a -> a));
+    
+        var keepIds = new java.util.HashSet<Long>();
+    
+        if (incoming != null) {
+            for (var dto : incoming) {
+                if (dto.id() == null) {
+                    // New anomaly
+                    var a = new InspectionImageAnomaly();
+                    a.setInspectionImage(img);
+                    a.setX(dto.x()); a.setY(dto.y());
+                    a.setWidth(dto.width()); a.setHeight(dto.height());
+                    a.setLabel(dto.label());
+                    a.setScore(dto.score()); a.setSize(dto.size());
+                    a.setComment(dto.comment());
+                    a.setOrigin(dto.origin() != null ? dto.origin() : AnomalyType.AI_GENERATED);
+                    a.setLastEditedBy(userId); // @PrePersist sets lastEditedAt
+                    anomalyRepo.save(a);
+                    keepIds.add(a.getId());
+                } else {
+                    var a = byId.get(dto.id());
+                    if (a == null) {
+                        // Unknown id -> treat as add (safety)
+                        var n = new InspectionImageAnomaly();
+                        n.setInspectionImage(img);
+                        n.setX(dto.x()); n.setY(dto.y());
+                        n.setWidth(dto.width()); n.setHeight(dto.height());
+                        n.setLabel(dto.label());
+                        n.setScore(dto.score()); n.setSize(dto.size());
+                        n.setComment(dto.comment());
+                        n.setOrigin(dto.origin() != null ? dto.origin() : AnomalyType.AI_GENERATED);
+                        n.setLastEditedBy(userId);
+                        anomalyRepo.save(n);
+                        keepIds.add(n.getId());
+                    } else {
+                        // Detect changes
+                        boolean changed =
+                                a.getX()      != dto.x() ||
+                                a.getY()      != dto.y() ||
+                                a.getWidth()  != dto.width() ||
+                                a.getHeight() != dto.height() ||
+                                !java.util.Objects.equals(a.getLabel(), dto.label()) ||
+                                !java.util.Objects.equals(a.getScore(), dto.score()) ||
+                                !java.util.Objects.equals(a.getSize(), dto.size()) ||
+                                !java.util.Objects.equals(a.getComment(), dto.comment()) ||
+                                (dto.origin() != null && a.getOrigin() != dto.origin());
+    
+                        // Apply changes (only if needed)
+                        if (changed) {
+                            a.setX(dto.x()); a.setY(dto.y());
+                            a.setWidth(dto.width()); a.setHeight(dto.height());
+                            a.setLabel(dto.label());
+                            a.setScore(dto.score()); a.setSize(dto.size());
+                            a.setComment(dto.comment());
+                            if (dto.origin() != null) {
+                                a.setOrigin(dto.origin());
+                            }
+                            a.setLastEditedBy(userId); // @PreUpdate sets lastEditedAt
+                            anomalyRepo.save(a);
+                        }
+                        keepIds.add(a.getId());
+                    }
+                }
+            }
+        }
+    
+        // Delete the ones removed by the client
+        for (var a : existing) {
+            if (!keepIds.contains(a.getId())) {
+                anomalyRepo.delete(a);
+            }
         }
 
+        var finalAnnotations = anomalyRepo.findByInspectionImage_Id(img.getId());
+        pythonTrainingService.bufferSample(
+                img.getId(),
+                img.getStoragePath(),   // or use getFilePath() if available
+                finalAnnotations
+        );
+    
         return imageRepo.findOneWithAnomalies(img.getId()).orElse(img);
     }
 
