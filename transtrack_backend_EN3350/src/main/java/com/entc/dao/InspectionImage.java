@@ -49,7 +49,16 @@ public class InspectionImage {
     @Column(nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
-    @OneToMany(mappedBy = "inspectionImage", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Column(name = "ai_anomalies_json", columnDefinition = "LONGTEXT")
+    private String aiAnomaliesJson;
+
+    @OneToMany(
+    mappedBy = "inspectionImage",
+    fetch = FetchType.LAZY,
+    cascade = CascadeType.ALL,
+    orphanRemoval = true
+    )
+    @OrderBy("id ASC")  // ensures consistent order every time (1, 2, 3, ...)
     private List<InspectionImageAnomaly> anomalies = new ArrayList<>();
 
     // Explicit getters for anomalies (in case Lombok/IDE got confused previously)

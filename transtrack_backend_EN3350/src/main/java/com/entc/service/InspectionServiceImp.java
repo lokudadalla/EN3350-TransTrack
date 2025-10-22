@@ -1,9 +1,13 @@
 package com.entc.service;
 
 import com.entc.dao.InspectionDetails;
+import com.entc.repository.InspectionImageAnomalyRepository;
+import com.entc.repository.InspectionImageRepository;
 import com.entc.repository.InspectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 
 import java.util.List;
 
@@ -12,6 +16,8 @@ import java.util.List;
 public class InspectionServiceImp implements InspectionService {
 
     private final InspectionRepository inspectionRepository;
+    private final InspectionImageRepository imageRepository;
+    private final InspectionImageAnomalyRepository anomalyRepository;
 
     @Override
     public List<InspectionDetails> getAllInspections(Long userId) {
@@ -62,10 +68,31 @@ public class InspectionServiceImp implements InspectionService {
                 .orElse(null);
     }
 
+    // @Override
+    // public void delete(Long userId, Long id) {
+    //     var existing = inspectionRepository.findByInspectionNoAndUserId(id, userId)
+    //             .orElseThrow(() -> new RuntimeException("Inspection not found or not owned by user"));
+    //     inspectionRepository.delete(existing);
+    // }
+
     @Override
+    @Transactional
     public void delete(Long userId, Long id) {
-        var existing = inspectionRepository.findByInspectionNoAndUserId(id, userId)
-                .orElseThrow(() -> new RuntimeException("Inspection not found or not owned by user"));
-        inspectionRepository.delete(existing);
+    var existing = inspectionRepository.findByInspectionNoAndUserId(id, userId)
+        .orElseThrow(() -> new RuntimeException("Inspection not found or not owned by user"));
+
+    //collect image ids
+    var imageIds = imageRepository.findIdsByInspection(id);
+
+    //delete anomalies for those images
+    if (!imageIds.isEmpty()) {
+        anomalyRepository.deleteAllByImageIds(imageIds);
+    }
+
+    //delete images for the inspection
+    imageRepository.deleteAllByInspection(id);
+
+    //finally delete the inspection
+    inspectionRepository.delete(existing);
     }
 }

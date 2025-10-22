@@ -19,9 +19,9 @@ CFG_PATH     = BASE_DIR / "ai_logic" / "cfg" / "config_global.json"
 
 class InferenceRequest(BaseModel):
     maintenance_image_path: str
-    baseline_image_path: Optional[str] = None   # optional
-    save_annot: Optional[str] = None            # optional file path to save preview
-    device: int = -1                            # 0=GPU, -1=CPU
+    baseline_image_path: Optional[str] = None  # optional
+    save_annot: Optional[str] = None  # optional file path to save preview
+    device: int = "cpu"  # 0=GPU, -1=CPU
     imgsz: int = 640
     half: bool = False
     web_payload: bool = True
@@ -108,6 +108,7 @@ async def infer(req: InferenceRequest):
             cfg_overrides=final_overrides,       # optional external overrides
             temperature_percent=req.temperature_percent,  # <-- slider (0..100)
         )
+        print(result)
         return result
 
     except HTTPException:

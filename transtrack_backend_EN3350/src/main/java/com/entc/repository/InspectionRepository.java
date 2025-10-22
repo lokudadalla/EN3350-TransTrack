@@ -1,7 +1,6 @@
 package com.entc.repository;
 
 import com.entc.dao.InspectionDetails;
-import com.entc.dao.TransformerDetails;
 
 import java.util.List;
 import java.util.Optional;

@@ -4,6 +4,7 @@ import numpy as np, cv2, json
 from math import exp
 from typing import Optional, Dict
 
+
 def infer_thermal(
     candidate_img: str,
     weights: str,
@@ -14,12 +15,13 @@ def infer_thermal(
     imgsz: int = 640,
     web_payload: bool = False,
     half: bool = True,
-    cfg_overrides: Optional[Dict] = None,
-    temperature_percent: Optional[int] = None,   # slider 0..100
+    cfg_overrides: dict | None = None,
+    temperature_percent: int | None = None,  # <-- slider 0..100
 ):
     # ------------------- config (with optional overrides) -------------------
     CFG = json.load(open(cfg_path, "r"))
     if cfg_overrides:
+
         def deep_merge(dst, src):
             for k, v in src.items():
                 if isinstance(v, dict) and isinstance(dst.get(k), dict):
@@ -27,6 +29,7 @@ def infer_thermal(
                 else:
                     dst[k] = v
             return dst
+
         deep_merge(CFG, cfg_overrides)
 
     def cfgv(path, default):
@@ -37,23 +40,29 @@ def infer_thermal(
             d = d[k]
         return d
 
-    # --- slider weight (0..1) for temperature gate + blended score ---
-    t = 0.0 if temperature_percent is None else max(0, min(100, int(temperature_percent))) / 100.0
-    base_gate = cfgv("temperature.base_gate", 0.0)   # gate at t=0
-    max_gate  = cfgv("temperature.max_gate", 0.60)   # gate at t=1
+    # --- slider weight (0..1) for anomaly score blending ---
+    if temperature_percent is None:
+        t = 0.0
+    else:
+        p = max(0, min(100, int(temperature_percent)))
+        t = p / 100.0
+
+    base_gate = cfgv("temperature.base_gate", 0.0)  # gate at t=0
+    max_gate = cfgv("temperature.max_gate", 0.60)  # gate at t=1
     gate = base_gate + t * (max_gate - base_gate)
 
     # ------------------------ utils ------------------------
     def load_rgb(path):
         bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
-        if bgr is None: raise FileNotFoundError(path)
+        if bgr is None:
+            raise FileNotFoundError(path)
         return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
     def normalize_palette(rgb):
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-        h,s,v = cv2.split(hsv)
+        h, s, v = cv2.split(hsv)
         v = cv2.equalizeHist(v)  # contrast-normalize V only
-        return cv2.cvtColor(cv2.merge([h,s,v]), cv2.COLOR_HSV2RGB)
+        return cv2.cvtColor(cv2.merge([h, s, v]), cv2.COLOR_HSV2RGB)
 
     def resize_to_match(a, b):
         H, W = a.shape[:2]
@@ -62,67 +71,84 @@ def infer_thermal(
     def register_affine(base_rgb, cand_rgb):
         b_gray = cv2.cvtColor(base_rgb, cv2.COLOR_RGB2GRAY)
         c_gray = cv2.cvtColor(cand_rgb, cv2.COLOR_RGB2GRAY)
-        warp = np.eye(2,3, dtype=np.float32)
+        warp = np.eye(2, 3, dtype=np.float32)
         try:
             _, warp = cv2.findTransformECC(
-                b_gray, c_gray, warp, cv2.MOTION_AFFINE,
-                (cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT, 100, 1e-6)
+                b_gray,
+                c_gray,
+                warp,
+                cv2.MOTION_AFFINE,
+                (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 1e-6),
             )
-            H,W = b_gray.shape
-            return cv2.warpAffine(cand_rgb, warp, (W,H), flags=cv2.INTER_LINEAR+cv2.WARP_INVERSE_MAP)
+            H, W = b_gray.shape
+            return cv2.warpAffine(
+                cand_rgb, warp, (W, H), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP
+            )
         except cv2.error:
             return cand_rgb
 
     def rgb_to_hsv01(img_rgb):
         hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV).astype(np.float32)
-        hsv[...,0] /= 179.0
-        hsv[...,1] /= 255.0
-        hsv[...,2] /= 255.0
+        hsv[..., 0] /= 179.0
+        hsv[..., 1] /= 255.0
+        hsv[..., 2] /= 255.0
         return hsv
 
     # ---------------------- rules: per-box ----------------------
     def classify_box(hsvC, vB, xywh):
-        x,y,w,h = map(int, xywh)
+        x, y, w, h = map(int, xywh)
         H, W = hsvC.shape[:2]
-        x = max(0, min(x, W-1)); y = max(0, min(y, H-1))
-        w = max(1, min(w, W-x)); h = max(1, min(h, H-y))
+        x = max(0, min(x, W - 1))
+        y = max(0, min(y, H - 1))
+        w = max(1, min(w, W - x))
+        h = max(1, min(h, H - y))
 
-        roi = hsvC[y:y+h, x:x+w]
-        hC, sC, vC_roi = roi[...,0], roi[...,1], roi[...,2]
+        roi = hsvC[y : y + h, x : x + w]
+        hC, sC, vC_roi = roi[..., 0], roi[..., 1], roi[..., 2]
 
         warm_h = (hC <= 0.17) | (hC >= 0.95)
         warm_s = sC >= cfgv("color.sat_min", 0.35)
         warm_v = vC_roi >= cfgv("color.val_min", 0.50)
 
-        vB_roi = np.zeros_like(vC_roi) if vB is None else vB[y:y+h, x:x+w]
-        med_base = cv2.medianBlur((vB_roi*255).astype(np.uint8), 31)/255.0
-        med_cand = cv2.medianBlur((vC_roi*255).astype(np.uint8), 31)/255.0
-        dv = (vC_roi - med_base)
-        dl = (vC_roi - med_cand)
+        if vB is None:
+            vB_roi = np.zeros_like(vC_roi)
+        else:
+            vB_roi = vB[y : y + h, x : x + w]
+        med_base = cv2.medianBlur((vB_roi * 255).astype(np.uint8), 31) / 255.0
+        med_cand = cv2.medianBlur((vC_roi * 255).astype(np.uint8), 31) / 255.0
+        dv = vC_roi - med_base
+        dl = vC_roi - med_cand
 
-        contrast_warm = (dv >= cfgv("color.dv_min", 0.12)) | (dl >= cfgv("color.dl_min", 0.08))
-        warm = (warm_h & warm_s & warm_v & contrast_warm)
+        contrast_warm = (dv >= cfgv("color.dv_min", 0.12)) | (
+            dl >= cfgv("color.dl_min", 0.08)
+        )
+        warm = warm_h & warm_s & warm_v & contrast_warm
 
         # HOT (stricter)
         hot_s = sC >= cfgv("color_hot.sat_min_hot", 0.45)
         hot_v = vC_roi >= cfgv("color_hot.val_min_hot", 0.65)
-        hot_contrast = (dv >= cfgv("color_hot.dv_min_hot", 0.18)) | (dl >= cfgv("color.dl_min", 0.08))
-        hot = (warm_h & hot_s & hot_v & hot_contrast)
+        hot_contrast = (dv >= cfgv("color_hot.dv_min_hot", 0.18)) | (
+            dl >= cfgv("color.dl_min", 0.08)
+        )
+        hot = warm_h & hot_s & hot_v & hot_contrast
 
         warm_pix = int(warm.sum())
-        hot_pix  = int(hot.sum())
+        hot_pix = int(hot.sum())
 
         min_pix = max(4, int(cfgv("shape.min_area_frac", 0.001) * H * W))
         ok_warm = warm_pix >= min_pix
-        ok_hot  = hot_pix  >= min_pix
+        ok_hot = hot_pix >= min_pix
 
-        area_frac_warm = warm_pix / float(H*W)
-        short = max(1, min(w,h)); long = max(w,h)
-        aspect = long/short
+        area_frac_warm = warm_pix / float(H * W)
+        short = max(1, min(w, h))
+        long = max(w, h)
+        aspect = long / short
 
         if area_frac_warm >= cfgv("shape.loose_area_frac", 0.10):
             rule_core = "loose_joint"
-        elif aspect >= cfgv("shape.wire_aspect_min", 2.2) and area_frac_warm < cfgv("shape.wire_area_max", 0.25):
+        elif aspect >= cfgv("shape.wire_aspect_min", 2.2) and area_frac_warm < cfgv(
+            "shape.wire_area_max", 0.25
+        ):
             rule_core = "wire_overload"
         else:
             rule_core = "point_overload"
@@ -140,41 +166,43 @@ def infer_thermal(
 
     # ------------------- global rule probe (fallback) -------------------
     def global_rule_probe(hsvC, vB):
-        hC, sC, vC = hsvC[...,0], hsvC[...,1], hsvC[...,2]
+        hC, sC, vC = hsvC[..., 0], hsvC[..., 1], hsvC[..., 2]
         warm_h = (hC <= 0.17) | (hC >= 0.95)
         warm_s = sC >= cfgv("color.sat_min", 0.35)
         warm_v = vC >= cfgv("color.val_min", 0.50)
 
-        med_cand = cv2.medianBlur((vC*255).astype(np.uint8), 31)/255.0
+        med_cand = cv2.medianBlur((vC * 255).astype(np.uint8), 31) / 255.0
         if vB is None:
-            dl = (vC - med_cand)
-            contrast = (dl >= cfgv("color.dl_min", 0.08))
+            dl = vC - med_cand
+            contrast = dl >= cfgv("color.dl_min", 0.08)
             dv_like = dl
         else:
-            med_base = cv2.medianBlur((vB*255).astype(np.uint8), 31)/255.0
-            dv = (vC - med_base)
-            dl = (vC - med_cand)
-            contrast = (dv >= cfgv("color.dv_min", 0.12)) | (dl >= cfgv("color.dl_min", 0.08))
+            med_base = cv2.medianBlur((vB * 255).astype(np.uint8), 31) / 255.0
+            dv = vC - med_base
+            dl = vC - med_cand
+            contrast = (dv >= cfgv("color.dv_min", 0.12)) | (
+                dl >= cfgv("color.dl_min", 0.08)
+            )
             dv_like = np.maximum(0.0, dv)
 
         warm = (warm_h & warm_s & warm_v & contrast).astype(np.uint8)
         warm_frac = float(warm.mean())
         dv95 = float(np.quantile(dv_like.ravel(), 0.95))
-        score = dv95 + 2.0*warm_frac
-        prob = 1.0/(1.0 + exp(-score))
+        score = dv95 + 2.0 * warm_frac
+        prob = 1.0 / (1.0 + exp(-score))
         return float(prob), warm
 
     def propose_boxes_from_warm(warm_mask):
         H, W = warm_mask.shape
         min_area = max(32, int(cfgv("shape.min_area_frac", 0.001) * H * W))
-        k = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+        k = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         wm = cv2.morphologyEx(warm_mask, cv2.MORPH_OPEN, k)
         num, labels, stats, _ = cv2.connectedComponentsWithStats(wm, 8)
         boxes = []
         for i in range(1, num):
-            x,y,w,h,area = map(int, stats[i])
+            x, y, w, h, area = map(int, stats[i])
             if area >= min_area:
-                boxes.append((x,y,w,h))
+                boxes.append((x, y, w, h))
         return boxes
 
     CLASS_COLORS = {
@@ -186,7 +214,7 @@ def infer_thermal(
 
     # ------------------- model + preprocessing -------------------
     model = YOLO(weights)
-    cand_raw  = load_rgb(candidate_img)      # YOLO sees original colors
+    cand_raw = load_rgb(candidate_img)  # YOLO sees original colors
     cand_norm = normalize_palette(cand_raw)  # rules see normalized copy
 
     vB = None
@@ -194,36 +222,45 @@ def infer_thermal(
         base = normalize_palette(load_rgb(baseline_img))
         cand_norm = resize_to_match(base, cand_norm)
         cand_norm = register_affine(base, cand_norm)
-        vB = rgb_to_hsv01(base)[...,2]
+        vB = rgb_to_hsv01(base)[..., 2]
 
     hsvC = rgb_to_hsv01(cand_norm)
 
     # ------------------- YOLO inference -------------------
-    pred = model.predict(cand_raw, device=device, half=half, imgsz=imgsz, verbose=False)[0]
+    pred = model.predict(
+        cand_raw, device=device, half=half, imgsz=imgsz, verbose=False
+    )[0]
 
     refined = []
     if len(pred.boxes):
         xyxy = pred.boxes.xyxy.cpu().numpy()
         conf = pred.boxes.conf.cpu().numpy()
-        for (x1,y1,x2,y2), cf in zip(xyxy, conf):
+        for (x1, y1, x2, y2), cf in zip(xyxy, conf):
             if float(cf) < cfgv("yolo_min_conf", 0.20):
                 continue
-            x, y, w, h = int(x1), int(y1), int(x2-x1), int(y2-y1)
-            ok_warm, ok_hot, rule_core, areaFrac, aspect = classify_box(hsvC, vB, (x,y,w,h))
+            x, y, w, h = int(x1), int(y1), int(x2 - x1), int(y2 - y1)
+            ok_warm, ok_hot, rule_core, areaFrac, aspect = classify_box(
+                hsvC, vB, (x, y, w, h)
+            )
             if not ok_warm:
                 continue
             final_name = final_name_from_rule(rule_core, ok_hot)
             if final_name == "normal":
                 continue
-            refined.append({
-                "x": x, "y": y, "w": w, "h": h,
-                "detConfidence": float(cf),
-                "ruleCore": rule_core,
-                "isHot": bool(ok_hot),
-                "finalClass": final_name,
-                "areaFrac": float(areaFrac),
-                "aspect": float(aspect),
-            })
+            refined.append(
+                {
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                    "detConfidence": float(cf),
+                    "ruleCore": rule_core,
+                    "isHot": bool(ok_hot),
+                    "finalClass": final_name,
+                    "areaFrac": float(areaFrac),
+                    "aspect": float(aspect),
+                }
+            )
 
     # ------------------- hybrid fallback -------------------
     rule_prob_thr = cfgv("decision.rule_prob_thr", 0.40)
@@ -231,36 +268,51 @@ def infer_thermal(
     rule_prob, warm_mask = global_rule_probe(hsvC, vB)
 
     if (len(refined) == 0) and use_rule_fallback and (rule_prob >= rule_prob_thr):
-        for (x, y, w, h) in propose_boxes_from_warm(warm_mask):
-            ok_warm, ok_hot, rule_core, areaFrac, aspect = classify_box(hsvC, vB, (x,y,w,h))
+        for x, y, w, h in propose_boxes_from_warm(warm_mask):
+            ok_warm, ok_hot, rule_core, areaFrac, aspect = classify_box(
+                hsvC, vB, (x, y, w, h)
+            )
             if not ok_warm:
                 continue
             if rule_core == "wire_overload":
                 final_name = "Full wire overload"
             elif rule_core == "loose_joint":
-                final_name = "Loose Joint -Faulty" if ok_hot else "Loose Joint -potential"
+                final_name = (
+                    "Loose Joint -Faulty" if ok_hot else "Loose Joint -potential"
+                )
             else:
-                final_name = "Point Overload Faulty" if ok_hot else "Loose Joint -potential"
-            refined.append({
-                "x": x, "y": y, "w": w, "h": h,
-                "detConfidence": float(rule_prob),  # proxy conf for fallback
-                "ruleCore": rule_core,
-                "isHot": bool(ok_hot),
-                "finalClass": final_name,
-                "areaFrac": float(areaFrac),
-                "aspect": float(aspect),
-            })
+                final_name = (
+                    "Point Overload Faulty" if ok_hot else "Loose Joint -potential"
+                )
+            refined.append(
+                {
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                    "detConfidence": float(rule_prob),  # proxy conf for fallback
+                    "ruleCore": rule_core,
+                    "isHot": bool(ok_hot),
+                    "finalClass": final_name,
+                    "areaFrac": float(areaFrac),
+                    "aspect": float(aspect),
+                }
+            )
 
     # ------------------- image-level decision (for full payload) -------------------
     FAULTY = {"Loose Joint -Faulty", "Point Overload Faulty"}
-    POT    = {"Loose Joint -potential", "Full wire overload"}
+    POT = {"Loose Joint -potential", "Full wire overload"}
 
     has_faulty = any(b["finalClass"] in FAULTY for b in refined)
-    has_pot    = any(b["finalClass"] in POT for b in refined)
+    has_pot = any(b["finalClass"] in POT for b in refined)
     grade = "faulty" if has_faulty else ("potentially faulty" if has_pot else "normal")
 
-    weights_for_score = {**{k:1.0 for k in FAULTY}, **{k:0.7 for k in POT}}
-    legacy_image_score = max((weights_for_score[b["finalClass"]]*b["detConfidence"] for b in refined), default=0.0)
+    # legacy image score (kept for full payload)
+    weights_for_score = {**{k: 1.0 for k in FAULTY}, **{k: 0.7 for k in POT}}
+    legacy_image_score = max(
+        (weights_for_score[b["finalClass"]] * b["detConfidence"] for b in refined),
+        default=0.0,
+    )
 
     full_result = {
         "image": str(candidate_img),
@@ -284,15 +336,17 @@ def infer_thermal(
         per_box_score = (1.0 - t) * det_conf + t * rule_strength
         per_box_score = max(0.0, min(1.0, per_box_score))
 
-        web_boxes.append({
-            "x": int(b["x"]),
-            "y": int(b["y"]),
-            "width": int(b["w"]),
-            "height": int(b["h"]),
-            "label": str(b["finalClass"]),
-            "score": round(per_box_score, 4),
-            "size": float(b["w"] * b["h"]),
-        })
+        web_boxes.append(
+            {
+                "x": int(b["x"]),
+                "y": int(b["y"]),
+                "width": int(b["w"]),
+                "height": int(b["h"]),
+                "label": str(b["finalClass"]),
+                "score": round(per_box_score, 4),
+                "size": float(b["w"] * b["h"]),
+            }
+        )
 
     if web_payload:
         return {"boxes": web_boxes}
@@ -303,18 +357,27 @@ def infer_thermal(
     if save_annot:
         out = cv2.cvtColor(cand_raw, cv2.COLOR_RGB2BGR).copy()
         for b in refined:
-            x,y,w,h = b["x"], b["y"], b["w"], b["h"]
+            x, y, w, h = b["x"], b["y"], b["w"], b["h"]
             color = {
                 "Loose Joint -Faulty": (0, 0, 255),
                 "Point Overload Faulty": (0, 128, 255),
                 "Loose Joint -potential": (0, 255, 255),
                 "Full wire overload": (255, 0, 0),
-            }.get(b["finalClass"], (200,200,200))
-            cv2.rectangle(out, (x,y), (x+w, y+h), color, 2)
+            }.get(b["finalClass"], (200, 200, 200))
+            cv2.rectangle(out, (x, y), (x + w, y + h), color, 2)
             label = f"{b['finalClass']} {b['detConfidence']:.2f}"
-            (tw,th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-            cv2.rectangle(out, (x, y-18), (x+tw+6, y), color, -1)
-            cv2.putText(out, label, (x+3, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1, cv2.LINE_AA)
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(out, (x, y - 18), (x + tw + 6, y), color, -1)
+            cv2.putText(
+                out,
+                label,
+                (x + 3, y - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
         Path(save_annot).parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(save_annot), out)
         result["annotated"] = str(save_annot)
