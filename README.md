@@ -1,6 +1,6 @@
 # EN3350-TransTrack
 
-**EN3350-TransTrack** is the **Phase 1 deliverable** of a course project developed under the *EN3350 Software Engineering* module.  
+**EN3350-TransTrack** is the **Phase 1/2/3 deliverable** of a course project developed under the *EN3350 Software Engineering* module.  
 The system provides a comprehensive platform to manage **power transformer assets**, record **inspection sessions**, and upload **thermal images** for anomaly detection through an integrated **AI backend**.
 
 ---
