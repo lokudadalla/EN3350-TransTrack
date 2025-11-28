@@ -633,73 +633,6 @@ const mergedLogs = useMemo<LogItem[]>(() => {
 
   const recordStatus: MaintenanceStatus = maintenanceRecord?.status ?? "NEEDS_MAINTENANCE";
   const recordFinalized = Boolean(maintenanceRecord?.finalizedAt);
-
-  function pdfEscape(text: string) {
-    return text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-  }
-
-  function downloadPdfReport() {
-    if (!maintenanceRecord) return;
-    const lines: string[] = [];
-    lines.push(`Maintenance Record #${maintenanceRecord.id ?? ""}`);
-    lines.push(`Transformer: ${header.transformerNo}`);
-    lines.push(`Branch: ${header.branch}`);
-    lines.push(`Inspection: ${maintenanceRecord.inspectionDate ?? "-"} ${maintenanceRecord.inspectionTime ?? ""}`);
-    lines.push(`Record date: ${maintenanceRecord.recordDate ?? "-"}`);
-    lines.push(`Status: ${recordStatus}`);
-    lines.push(`Inspector: ${maintenanceRecord.inspectorName ?? "-"}`);
-    lines.push(`Voltage: ${maintenanceRecord.electricalReadings?.voltage ?? "-"}`);
-    lines.push(`Current: ${maintenanceRecord.electricalReadings?.current ?? "-"}`);
-    lines.push(`Recommended: ${maintenanceRecord.recommendedAction ?? "-"}`);
-    lines.push(`Remarks: ${maintenanceRecord.remarks ?? "-"}`);
-    lines.push(`Anomalies: ${(maintenanceRecord.anomalies?.length ?? 0)}`);
-    (maintenanceRecord.anomalies ?? []).forEach((a, idx) => {
-      lines.push(
-        `  ${idx + 1}. ${a.label ?? "Unlabeled"} | box x:${a.x} y:${a.y} w:${a.width} h:${a.height} | note: ${a.comment ?? "-"}`
-      );
-    });
-
-    const contentLines = lines.map(pdfEscape).map((t) => `(${t}) Tj T*`).join("\n");
-
-    const contentStream = `BT
-/F1 12 Tf
-14 TL
-1 0 0 1 72 780 Tm
-${contentLines}
-ET`;
-    const contentLength = contentStream.length;
-
-    const pdf = `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
-4 0 obj << /Length ${contentLength} >> stream
-${contentStream}
-endstream endobj
-5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
-xref
-0 6
-0000000000 65535 f 
-0000000010 00000 n 
-0000000061 00000 n 
-0000000114 00000 n 
-0000000268 00000 n 
-0000000430 00000 n 
-trailer << /Size 6 /Root 1 0 R >>
-startxref
-${530 + contentLength}
-%%EOF`;
-
-    const blob = new Blob([pdf], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `maintenance-${header.transformerNo}-${maintenanceRecord.inspectionNo ?? numericInspectionId}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
   
   const numericThreshold = (() => {
     if (typeof temperature === "number") return clampThreshold(temperature);
@@ -1570,7 +1503,7 @@ function updateAnomalyLabelAt(i: number, label: string) {
                 Generate from inspection
               </button>
               <button
-                onClick={downloadPdfReport}
+                onClick={() => window.print()}
                 style={zoomBtnStyle(false)}
                 title="Print or save as PDF"
               >
