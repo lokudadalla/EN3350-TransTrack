@@ -160,26 +160,27 @@ Engineers can fill:
 
 EN3350-TransTrack/
 │
-├── transtrack_backend_EN3350/ # Spring Boot backend
-│ ├── controller/ # REST controllers
-│ ├── service/ # Business logic
-│ ├── repo/ # JPA repositories
-│ ├── model/ # JPA entities
-│ ├── resources/ # Config + schema
-│ └── pom.xml
+├── AI_backend/
+│   ├── ai_logic/
+│   ├── train/
+│   └── main.py
 │
-├── frontend/ # React + TS frontend
-│ ├── src/ # Components, pages, API calls
-│ ├── public/
-│ └── package.json
+├── frontend/
+│   ├── node_modules/
+│   ├── public/
+│   ├── src/
 │
-├── AI_backend/ # FastAPI + YOLOv5 inference
-│ ├── ai_logic/
-│ ├── best2.pt
-│ └── main.py
-│
-└── README.md
-
+├── transtrack_backend_EN3350/
+│   ├── .mvn/
+│   ├── ai_logic/
+│   ├── src/
+│   ├── target/
+│   ├── training_batches/
+│   ├── uploads/
+│ 
+├── README.md
+│ 
+└── transtrack_db.sql
 ---
 
 # 5. Tech Stack
