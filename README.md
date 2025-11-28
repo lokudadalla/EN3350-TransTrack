@@ -4,7 +4,6 @@ A complete end-to-end system for transformer thermal inspection, AI-assisted ano
 
 Developed for the **EN3350 Software Design Competition**  
 Department of Electronic & Telecommunication Engineering  
-Department of Biomedical Engineering  
 University of Moratuwa
 
 ---
@@ -133,3 +132,146 @@ Engineers can fill:
 # 3. System Architecture
 
 ## **High-Level Architecture**
+
+               +------------------------------+
+               |          Frontend            |
+               |     React + TypeScript       |
+               +---------------+--------------+
+                               |
+                               |  REST
+                               v
+                  +------------+-------------+
+                  |       Spring Boot        |
+                  |  Transformer + Image API |
+                  +------------+-------------+
+                               |
+             +-----------------+------------------+
+             |                                    |
+             | JPA / MySQL DB                     | REST to AI Backend
+             v                                    v
+      +------+--------+                 +----------+---------+
+      |   MySQL 8     |                 |   FastAPI + YOLOv5 |
+      |  Data Store   |                 |  Inference Engine  |
+      +---------------+                 +---------------------+
+
+---
+
+# 4. Folder Structure
+
+EN3350-TransTrack/
+│
+├── transtrack_backend_EN3350/ # Spring Boot backend
+│ ├── controller/ # REST controllers
+│ ├── service/ # Business logic
+│ ├── repo/ # JPA repositories
+│ ├── model/ # JPA entities
+│ ├── resources/ # Config + schema
+│ └── pom.xml
+│
+├── frontend/ # React + TS frontend
+│ ├── src/ # Components, pages, API calls
+│ ├── public/
+│ └── package.json
+│
+├── AI_backend/ # FastAPI + YOLOv5 inference
+│ ├── ai_logic/
+│ ├── best2.pt
+│ └── main.py
+│
+└── README.md
+
+---
+
+# 5. Tech Stack
+
+## **Backend — Spring Boot**
+- Java 21  
+- Spring Boot 3.5  
+- Spring Data JPA (MySQL 8)  
+- ModelMapper  
+- Lombok  
+- Springdoc OpenAPI  
+- All APIs return **ResponseEntity**  
+
+## **Frontend — React + TypeScript**
+- React 19  
+- Vite  
+- Axios  
+- React Router  
+- Custom UI for:
+  - Transformer CRUD  
+  - Inspections  
+  - Image upload  
+  - Annotation tools  
+  - Maintenance forms  
+
+## **AI Backend — FastAPI**
+- FastAPI  
+- Pydantic  
+- YOLOv5 inference  
+- Torch + OpenCV  
+- Parameterized inference pipeline  
+
+---
+
+# 6. API Endpoints (Summary)
+
+## **Auth**
+| Method | Endpoint | Description |
+|-------|----------|-------------|
+| POST | `/auth/register` | Register |
+| POST | `/auth/login` | Login |
+
+## **Transformers**
+| Method | Endpoint | Description |
+|-------|----------|-------------|
+| POST | `/transformers` | Create transformer |
+| GET | `/transformers` | List all |
+| GET | `/transformers/{id}` | Get by ID |
+| GET | `/transformers/by-no?no=` | Get by transformer number |
+| PUT | `/transformers/{id}` | Update |
+| DELETE | `/transformers/{id}` | Delete |
+
+## **Inspections**
+| Method | Endpoint | Description |
+|-------|----------|-------------|
+| POST | `/inspections` | Create inspection |
+| GET | `/inspections` | List |
+| GET | `/inspections/{id}` | Get |
+| GET | `/inspections/by-no?no=` | Get by transformer |
+| PUT | `/inspections/{id}` | Update |
+| DELETE | `/inspections/{id}` | Delete |
+
+## **Images**
+| Method | Endpoint | Description |
+|-------|----------|-------------|
+| POST | `/inspections/{id}/images` | Upload image |
+| GET | `/inspections/{id}/images` | List images |
+| GET | `/inspections/{id}/images/{imageId}/file` | Get file |
+| DELETE | `/inspections/{id}/images/{imageId}` | Delete |
+
+## **Annotations**
+| Method | Endpoint | Description |
+|-------|----------|-------------|
+| PUT | `/inspections/{id}/images/{imageId}/anomalies` | Replace anomaly list |
+| DELETE | `/inspections/{id}/images/{imageId}/anomalies/{anomId}` | Delete anomaly |
+
+## **Maintenance Records**
+| Method | Endpoint | Description |
+|-------|----------|-------------|
+| POST | `/records` | Create maintenance record |
+| GET | `/records/{transformerNo}` | Get all records for a transformer |
+| GET | `/records/view/{id}` | View a specific record |
+
+---
+
+# 7. Getting Started
+
+## **Backend**
+```bash
+cd transtrack_backend_EN3350
+./mvnw spring-boot:run
+```
+### Set DB credentials in:
+
+application.properties
