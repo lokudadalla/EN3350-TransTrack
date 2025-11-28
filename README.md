@@ -211,7 +211,7 @@ Visit: http://localhost:5173
 ```bash
 cd AI_backend
 pip install -r requirements.txt
-uvicorn ai_logic.main:app --reload --port 8000
+uvicorn main:app --reload --port 8000
 ```
 
 **Environment variable (optional):**
