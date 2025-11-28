@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import os, tempfile, requests
 from urllib.parse import urlparse
+# from ai_logic.finetune import main_train
 
 from ai_logic.infer_thermal import infer_thermal
 
@@ -75,6 +76,16 @@ def _fetch_to_local(path_or_id: str) -> str:
     tmp.write(resp.content)
     tmp.close()
     return tmp.name
+
+
+
+# @app.post("/train")
+# async def train_model():
+#     try:
+#         main_train()
+#         return {"status": "Training completed successfully."}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Training failed: {e}")
 
 
 @app.post("/infer")

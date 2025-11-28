@@ -30,3 +30,4 @@ export function isAuthed() {
   return !!(u && typeof u.id === "number" && Number.isFinite(u.id));
 }
 export function logout() { localStorage.removeItem(KEY); }
+  
