@@ -1,249 +1,135 @@
 # EN3350-TransTrack
 
-**EN3350-TransTrack** is the **Phase 1/2/3 deliverable** of a course project developed under the *EN3350 Software Engineering* module.  
-The system provides a comprehensive platform to manage **power transformer assets**, record **inspection sessions**, and upload **thermal images** for anomaly detection through an integrated **AI backend**.
+A complete end-to-end system for transformer thermal inspection, AI-assisted anomaly detection, interactive annotation, and digital maintenance record generation.
+
+Developed for the **EN3350 Software Design Competition**  
+Department of Electronic & Telecommunication Engineering  
+Department of Biomedical Engineering  
+University of Moratuwa
 
 ---
 
-## 🚀 Project Overview
-
-The goal of this phase is to implement the foundational architecture that enables:
-
-- Transformer registration and inspection tracking  
-- Secure user authentication  
-- Thermal image upload and retrieval  
-- Integration with an external AI inference backend for anomaly detection  
-
-Future phases will focus on **interactive anomaly feedback**, **model retraining integration**, and **user analytics dashboards**.
+<p align="center">
+  <img src="https://img.shields.io/badge/Backend-Spring%20Boot%203.5-brightgreen" />
+  <img src="https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-blue" />
+  <img src="https://img.shields.io/badge/AI%20Backend-FastAPI%20%2B%20YOLOv5-orange" />
+  <img src="https://img.shields.io/badge/Database-MySQL%208-lightgrey" />
+  <img src="https://img.shields.io/badge/License-Apache%202.0-yellow" />
+</p>
 
 ---
 
-## 🧱 Repository Structure
-```
-EN3350-TransTrack/
-│
-├── transtrack_backend_EN3350/        # Spring Boot backend
-│   ├── src/main/java/com/entc/controller/  # REST controllers
-│   ├── src/main/java/com/entc/service/     # Business logic services
-│   ├── src/main/java/com/entc/repo/        # JPA repositories
-│   ├── src/main/java/com/entc/model/       # Entity models
-│   ├── src/main/resources/                 # Configuration files
-│   └── pom.xml                             # Maven dependencies
-│
-├── frontend/                          # React + TypeScript frontend (Vite)
-│   ├── src/                          # Components, routes, API services
-│   ├── public/                       # Static assets
-│   └── package.json                  # Node dependencies
-│
-├── AI_backend/                        # FastAPI-based AI inference service
-│   ├── ai_logic/                     # YOLO inference and configuration files
-│   ├── best2.pt                      # YOLOv5 trained weights
-│   └── main.py                       # FastAPI entry point
-│
-├── LICENSE
-└── README.md
-```
+# 1. Overview
+
+**EN3350-TransTrack** digitizes the entire workflow of transformer thermal inspections:
+
+- Managing transformer assets  
+- Uploading baseline and maintenance thermal images  
+- Running AI-based anomaly detection  
+- Allowing engineers to validate, correct, or add annotations  
+- Generating complete digital maintenance records with embedded anomalies  
+
+The system implements **all Functional Requirements (FR1.1–FR4.3)** from the official EN3350 multi-phase project outline.
 
 ---
 
-## 🧰 Tech Stack
+# 2. Features Summary (FR1–FR4 Fully Completed)
 
-### **Backend (Java Spring Boot)**
-- Java 21 + Spring Boot 3.5
-- Spring Data JPA (MySQL)
-- Validation + Lombok + dotenv
-- Springdoc OpenAPI for documentation
-- ModelMapper for DTO conversions
-- RESTful architecture with `ResponseEntity` handling
+## **Phase 1 – Transformer & Baseline Image Management**
 
-### **Frontend (React + TypeScript)**
-- React 19 with Vite build tool
-- TypeScript + Axios + React Router
-- ESLint for linting and code quality
-- Simple UI for CRUD operations and image uploads
+### ✔ FR1.1 Transformer Management
+- Add, view, edit, delete transformer records  
+- Store ID, location, capacity, and metadata  
+- Structured admin dashboard
 
-### **AI Backend (Python FastAPI)**
-- FastAPI + Pydantic
-- YOLOv5-based model (`best2.pt`)
-- Thermal image anomaly detection
-- Integrated configuration overrides via JSON
-- Image fetching from Spring backend via REST
-- OpenCV + Torch inference pipeline (`infer_thermal`)
+### ✔ FR1.2 Thermal Image Upload + Tagging
+- Upload **Baseline** and **Maintenance** images  
+- Associate images with transformers and inspection sessions  
+- Store metadata: date, uploader, type, transformer, inspection ID
+
+### ✔ FR1.3 Environmental Categorization
+- Baseline uploads include **Sunny / Cloudy / Rainy** tagging  
+- Weather metadata saved and queryable
 
 ---
 
-## ⚙️ Core Functionality
+## **Phase 2 – Automated Anomaly Detection**
 
-### 1. **User Authentication**
-- Simple `/auth/register` and `/auth/login` endpoints  
-- Plain-text password storage (for prototype phase only)  
-- Uses `UserRepository` for persistence  
+### ✔ FR2.1 AI Comparison Engine
+- FastAPI YOLOv5 model  
+- Compares maintenance vs. baseline images  
+- Detects thermal anomalies:
+  - Hotspots  
+  - Temperature deviations  
+  - Asymmetries  
 
-### 2. **Transformer Management**
-- Register, update, and delete transformer details
-- Fetch by ID or transformer number
-- Optional "favorite" field for user marking
+### ✔ FR2.2 Side-by-Side Comparison UI
+- Baseline and maintenance images shown side-by-side
+- Zoom, pan, and reset tools
+- Overlays of detected anomalies
 
-### 3. **Inspection Management**
-- Record and query inspection sessions
-- Link inspections to transformers and users
-- Retrieve inspections by transformer number
-
-### 4. **Image Upload and Retrieval**
-- Upload images under an inspection (`BASELINE` or `MAINTENANCE`)
-- Retrieve stored files for display or inference
-- Delete or update anomalies linked to an image
-
-### 5. **AI Inference Integration**
-- When a MAINTENANCE image is uploaded, it is automatically sent to the AI backend
-- The backend performs YOLO-based thermal anomaly detection
-- The output JSON (`{"boxes":[...]}`) is returned and stored in the database
+### ✔ FR2.3 Automatic Anomaly Marking
+- Bounding boxes and severity metadata
+- Confidence scores
+- Stored in DB for Phase 3 interaction
 
 ---
 
-## 🔗 API Endpoints Summary
+## **Phase 3 – Interactive Annotation & Feedback**
 
-| Method | Endpoint | Description |
-|--------|-----------|-------------|
-| **Auth** |  |  |
-| `POST` | `/auth/register` | Register a new user |
-| `POST` | `/auth/login` | Login with credentials |
-| **Transformers** |  |  |
-| `POST` | `/transformers` | Create transformer |
-| `GET` | `/transformers` | List all transformers |
-| `GET` | `/transformers/{id}` | Get transformer by ID |
-| `GET` | `/transformers/by-no?no=` | Get transformer by number |
-| `PUT` | `/transformers/{id}` | Update transformer |
-| `DELETE` | `/transformers/{id}` | Delete transformer |
-| **Inspections** |  |  |
-| `POST` | `/inspections` | Create inspection record |
-| `GET` | `/inspections` | List all inspections |
-| `GET` | `/inspections/{id}` | Get inspection by ID |
-| `GET` | `/inspections/by-no?no=` | List inspections by transformer number |
-| `PUT` | `/inspections/{id}` | Update inspection |
-| `DELETE` | `/inspections/{id}` | Delete inspection |
-| **Inspection Images** |  |  |
-| `POST` | `/inspections/{inspectionId}/images` | Upload inspection images |
-| `GET` | `/inspections/{inspectionId}/images` | List inspection images |
-| `GET` | `/inspections/{inspectionId}/images/{imageId}/file` | Download image file |
-| `DELETE` | `/inspections/{inspectionId}/images/{imageId}` | Delete image |
-| `PUT` | `/inspections/{inspectionId}/images/{imageId}/anomalies` | Replace anomalies |
-| `DELETE` | `/inspections/{inspectionId}/images/{imageId}/anomalies/{anomalyId}` | Delete anomaly |
+### ✔ FR3.1 Annotation Tools
+- Engineers can:
+  - Drag/resize predicted boxes
+  - Delete wrong detections
+  - Add new anomalies (box or polygon)
+- Supports comments + notes
+
+### ✔ FR3.2 Persistence of Annotations
+- Every annotation (added/edited/deleted) saved automatically  
+- Metadata:
+  - User ID  
+  - Timestamp  
+  - Annotation type  
+  - Geometry  
+- Reloads instantly when image is opened again
+
+### ✔ FR3.3 Feedback Loop for Model Improvement
+- Exportable JSON/CSV log including:
+  - Original AI detections
+  - Final human annotations  
+  - Transformer ID, image ID, timestamps, user actions  
+- Ready for fine-tuning or dataset updates
 
 ---
 
-## 🧠 AI Backend API
+## **Phase 4 – Maintenance Record Sheet Generation**
 
-### Endpoint: `/infer`
-Performs inference between a **maintenance image** and an optional **baseline image**.
+### ✔ FR4.1 Maintenance Record Form
+For each processed inspection, system auto-generates a digital maintenance form including:
 
-#### Request Example:
-```json
-{
-  "maintenance_image_path": "http://localhost:8080/inspections/1/images/3/file",
-  "baseline_image_path": "http://localhost:8080/inspections/1/images/2/file",
-  "save_annot": "/tmp/annot.jpg",
-  "temperature_percent": 50,
-  "device": "cpu",
-  "web_payload": true
-}
-```
+- Transformer metadata  
+- Inspection timestamp  
+- Embedded thermal image  
+- Anomaly markers (from Phase 3)  
+- Full anomaly list with descriptions, severity, and notes  
 
-#### Response Example:
-```json
-{
-  "boxes": [
-    { "label": "Loose Joint - Faulty", "x": 120, "y": 50, "w": 90, "h": 80 },
-    { "label": "Point Overload Faulty", "x": 300, "y": 0, "w": 250, "h": 200 }
-  ]
-}
-```
+### ✔ FR4.2 Engineer Editable Fields
+Engineers can fill:
 
----
+- Inspector name  
+- Transformer status (OK / Needs Maintenance / Urgent Attention)  
+- Voltage, current, and other readings  
+- Recommended actions  
+- Additional remarks  
 
-## 🧩 System Integration Flow
-
-1. **Frontend** uploads an image → calls  
-   `POST /inspections/{inspectionId}/images?type=MAINTENANCE`
-
-2. **Spring Boot Backend** stores the file and triggers the AI backend
-
-3. **FastAPI Service** fetches the file from Spring Boot using a public URL
-
-4. **YOLOv5 model** runs inference and returns detected anomalies
-
-5. **Spring Boot** stores and serves the annotated results
+### ✔ FR4.3 Record Saving + Retrieval
+- Records saved to DB  
+- Versioned + timestamped  
+- View history of records per transformer  
+- Printable/PDF-ready layout
 
 ---
 
-## 🧑‍💻 Getting Started
+# 3. System Architecture
 
-### Backend (Spring Boot)
-```bash
-# Navigate to backend folder
-cd transtrack_backend_EN3350
-
-# Run with Maven Wrapper
-./mvnw spring-boot:run
-```
-
-**Configuration:**
-
-Set database credentials in `.env` or `application.properties`
-
-Example:
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/transtrack
-spring.datasource.username=root
-spring.datasource.password=your_password
-app.public.base=http://localhost:8080
-```
-
-### Frontend (React + TypeScript)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Visit: http://localhost:5173
-
-### AI Backend (FastAPI)
-```bash
-cd AI_backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-**Environment variable (optional):**
-```bash
-export APP_PUBLIC_BASE="http://localhost:8080"
-```
-
----
-
-## 🧪 Testing
-
-### Backend
-```bash
-cd transtrack_backend_EN3350
-./mvnw test
-```
-
-### Frontend
-```bash
-cd frontend
-npm test
-```
-
-### AI Backend
-```bash
-curl -X POST http://localhost:8000/infer -H "Content-Type: application/json" \
--d '{"maintenance_image_path": "http://localhost:8080/inspections/1/images/3/file"}'
-```
-
----
-
-## 🧾 License
-
-This project is licensed under the Apache License 2.0.
-
+## **High-Level Architecture**
