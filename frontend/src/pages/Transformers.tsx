@@ -10,6 +10,7 @@ import {
 import { REGIONS_SL } from "../constants/regions";
 import Modal from "../components/Modal";
 
+
 type EditState = {
   id: string; 
   region: string;
@@ -23,6 +24,7 @@ type EditState = {
 type SearchField = "id" | "poleNo";
 
 const PAGE_SIZE = 10;
+
 
 export default function Transformers() {
   const navigate = useNavigate();
@@ -63,6 +65,7 @@ export default function Transformers() {
   const [page, setPage] = useState(1);
 
   const ids = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+
 
   async function refresh() {
     setLoading(true);
@@ -420,10 +423,25 @@ export default function Transformers() {
                       )}
                     </td>
 
-                    {/*  */}
-
                     <td>
                       <div className="hstack" style={{ justifyContent: "flex-end", gap: 8 }}>
+                        {!isEditing && (
+                          <button
+                            onClick={() => navigate(`/transformers/${t.id}/history`)}
+                            style={{
+                              background: "#0e0d0eff",
+                              color: "#fff",
+                              border: 0,
+                              padding: "6px 14px",
+                              borderRadius: 10,
+                            }}
+                            title="View maintenance record history"
+                          >
+                            History
+                          </button>
+                        )}
+                        
+
                         {!isEditing && (
                           <button
                             onClick={() => handleView(t.id)}

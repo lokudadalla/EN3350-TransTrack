@@ -113,6 +113,38 @@ LOCK TABLES `transformers` WRITE;
 INSERT INTO `transformers` VALUES (1,'TX-1001','P-45','Gampaha','Distribution','Near Main Street',1,'2025-08-15 12:25:46.000000'),(4,'TX-1005','P-47','Mawaramandiya','Bulk','Mawaramandiya junction',1,'2025-08-12 12:30:00.000000'),(7,'Tx-1006','P-41','Trincomalee','Bulk','near pigeon island',1,'2025-08-23 13:36:19.125369'),(8,'TX-1008','P-60','Gampaha','Distribution','near keells',0,'2025-08-27 17:16:39.279628'),(9,'TX-1009','P-64','Avissawella','Bulk','Near university',0,'2025-08-27 17:46:22.035143');
 /*!40000 ALTER TABLE `transformers` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `maintenance_records`
+--
+
+DROP TABLE IF EXISTS `maintenance_records`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `maintenance_records` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `inspection_no` bigint NOT NULL,
+  `transformer_no` varchar(255) NOT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  `finalized_at` datetime(6) DEFAULT NULL,
+  `record_date` date DEFAULT NULL,
+  `status` enum('OK','NEEDS_MAINTENANCE','URGENT_ATTENTION') DEFAULT NULL,
+  `inspector_name` varchar(255) DEFAULT NULL,
+  `recommended_action` text,
+  `remarks` text,
+  `electrical_readings_json` longtext,
+  `anomalies_snapshot` longtext,
+  `maintenance_image_id` bigint DEFAULT NULL,
+  `maintenance_image_url` varchar(255) DEFAULT NULL,
+  `version_num` int DEFAULT '1',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_maintenance_inspection` (`inspection_no`),
+  KEY `fk_maintenance_inspection` (`inspection_no`),
+  CONSTRAINT `fk_maintenance_inspection` FOREIGN KEY (`inspection_no`) REFERENCES `inspections` (`inspection_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
