@@ -164,24 +164,31 @@ EN3350-TransTrack/
 │
 ├── AI_backend/
 │   ├── ai_logic/
+│   │   ├── cfg/
+│   │   ├── best.pt
+│   │   ├── best2.pt
+│   │   ├── finetune.py
+│   │   └── infer_thermal.py
 │   ├── train/
-│   └── main.py
+│   ├── main.py
+│   └── requirements.txt
 │
 ├── frontend/
 │   ├── node_modules/
 │   ├── public/
 │   ├── src/
+│   └── package.json
 │
 ├── transtrack_backend_EN3350/
 │   ├── .mvn/
-│   ├── ai_logic/
 │   ├── src/
 │   ├── target/
 │   ├── training_batches/
 │   ├── uploads/
-│ 
+│   └── pom.xml
+│
+├── .gitignore
 ├── README.md
-│ 
 └── transtrack_db.sql
 ```
 ---
@@ -276,9 +283,41 @@ EN3350-TransTrack/
 cd transtrack_backend_EN3350
 ./mvnw spring-boot:run
 ```
-### Set DB credentials in:
+Set DB credentials in `application.properties`:
 
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/trans_track
+spring.datasource.username=root
+spring.datasource.password=${SQL_PW:your_password_here}
 ```
-application.properties
+### **Frontend**
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
+Runs at: http://localhost:5173
+
+### **AI Backend**
+
+```bash
+cd AI_backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+Runs at: http://localhost:8000
+
+---
+
+## 8. License
+
+This project is released under the Apache License 2.0.
+
+## 9. Team
+
+Team 404
+University of Moratuwa
+2021 Batch
