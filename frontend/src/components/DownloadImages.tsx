@@ -1,5 +1,5 @@
 import React from "react";
-import type { ImageMeta, AnomalyMeta } from "../types/models";
+import type { ImageMeta } from "../types/models";
 import { toDisplayAnomalies } from "../utils/utils";
 import {zoomBtnStyle } from "../ui/ui";
 
@@ -12,14 +12,6 @@ type Props = {
   style?: React.CSSProperties;
   buttonClassName?: string;
 };
-
-/* ------------ local helpers (copied/adapted from InspectionDetail) ------------ */
-function sameBox(a: AnomalyMeta, b: AnomalyMeta, tol = 2): boolean {
-  if (typeof a.id === "number" && typeof b.id === "number" && a.id === b.id) return true;
-  const close = (p: number, q: number) => Math.abs(p - q) <= tol;
-  const labelSame = (a.label ?? "").trim().toLowerCase() === (b.label ?? "").trim().toLowerCase();
-  return close(a.x, b.x) && close(a.y, b.y) && close(a.width, b.width) && close(a.height, b.height) && labelSame;
-}
 
 function downloadBlob(content: string, mime: string, filename: string) {
   const blob = new Blob([content], { type: mime });

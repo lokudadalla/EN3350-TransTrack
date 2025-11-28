@@ -3,8 +3,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getUser } from "../auth"; // adjust path if needed
 import type { ZoomHandle } from "../types/models";
 import { ZoomableImage } from "../components/ZoomableImage";
-import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition, AnomalyMeta, AnomalyOrigin } from "../types/models";
+import type { InspectionDTO, ImageMeta, TransformerHeader, Status, ImageType, Condition, AnomalyMeta, AnomalyOrigin, MaintenanceRecord, MaintenanceStatus } from "../types/models";
 import { pollUntilAnomalies, resolveImageUrl, authHeaders, api, maintenanceForThisInspection, getInspectionIdsForTransformer, uploadImageToInspection, saveImageAnomalies, deleteImageAnomaly, createImageAnomaly } from "../api/Inspections";
+import { createMaintenanceRecord, getMaintenanceRecord, listMaintenanceHistory, updateMaintenanceRecord } from "../api/MaintenanceRecords";
 import { Figure } from "../components/Figure";
 import { AnomalyLegend } from "../components/AnomalyLegend";
 import DownloadImage from "../components/DownloadImages";
@@ -65,6 +66,29 @@ export default function InspectionDetail() {
 const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 const [notes, setNotes] = useState<string>("");
 
+  const [maintenanceRecord, setMaintenanceRecord] = useState<MaintenanceRecord | null>(null);
+  const [recordHistory, setRecordHistory] = useState<MaintenanceRecord[]>([]);
+  const [recordBusy, setRecordBusy] = useState(false);
+  const [recordMsg, setRecordMsg] = useState<string | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
+  const [recordForm, setRecordForm] = useState<{
+    inspectorName: string;
+    status: MaintenanceStatus;
+    voltage: string;
+    current: string;
+    recommendedAction: string;
+    remarks: string;
+    recordDate: string;
+  }>({
+    inspectorName: "",
+    status: "NEEDS_MAINTENANCE",
+    voltage: "",
+    current: "",
+    recommendedAction: "",
+    remarks: "",
+    recordDate: "",
+  });
+
 
 //   async function saveEditsForIndex(idx: number) {
 //   if (!maintMeta?.id) return;
@@ -124,7 +148,7 @@ async function saveEditsForIndex(idx: number) {
   if (!target) return;
 
   // Build payload: preserve non-edited rows exactly; change only idx
-  const anomaliesPayload = src.map((a, i) => {
+  const anomaliesPayload: AnomalyMeta[] = src.map((a, i): AnomalyMeta => {
     // keep the exact values for non-edited rows (no rounding, no renaming, no origin changes)
     if (i !== idx) {
       console.log("Preserving anomaly at index:", i);
@@ -144,7 +168,7 @@ async function saveEditsForIndex(idx: number) {
     console.log("Editing anomaly at index:", i);
 
     // edited row: apply your changes
-    const edited: Partial<AnomalyMeta> = {
+    const edited: AnomalyMeta = {
       ...(a.id != null ? { id: a.id } : {}),
       // if user resized/moved via UI, keep the current values as-is; don't round
       x: a.x, y: a.y, width: a.width, height: a.height,
@@ -353,6 +377,55 @@ async function saveEditsForIndex(idx: number) {
     };
   }, [numericInspectionId, transformerId]);
 
+  /* ----- Load maintenance record + history ----- */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!numericInspectionId) return;
+      setRecordBusy(true);
+      setRecordError(null);
+      try {
+        const rec = await getMaintenanceRecord(numericInspectionId);
+        if (cancelled) return;
+        setMaintenanceRecord(rec);
+      } catch (e: any) {
+        if (!cancelled) setRecordError(e?.message ?? "Failed to load maintenance record");
+      } finally {
+        if (!cancelled) setRecordBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [numericInspectionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!header.transformerNo) return;
+      try {
+        const hist = await listMaintenanceHistory(header.transformerNo);
+        if (!cancelled) setRecordHistory(hist);
+      } catch {
+        /* history is optional */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [header.transformerNo]);
+
+  useEffect(() => {
+    if (!maintenanceRecord) return;
+    setRecordForm({
+      inspectorName: maintenanceRecord.inspectorName ?? "",
+      status: maintenanceRecord.status ?? "NEEDS_MAINTENANCE",
+      voltage: maintenanceRecord.electricalReadings?.voltage ?? "",
+      current: maintenanceRecord.electricalReadings?.current ?? "",
+      recommendedAction: maintenanceRecord.recommendedAction ?? "",
+      remarks: maintenanceRecord.remarks ?? "",
+      recordDate: maintenanceRecord.recordDate ?? (inspection?.inspectionDate ?? ""),
+    });
+  }, [maintenanceRecord, inspection?.inspectionDate]);
+
   /* ----- Helpers: view/delete/upload ----- */
 
 type LogSource = "AI" | "USER";
@@ -487,6 +560,56 @@ const mergedLogs = useMemo<LogItem[]>(() => {
     setUploadPct(0);
   }
 
+  const recordAnomalies = useMemo(() => maintenanceRecord?.anomalies ?? [], [maintenanceRecord]);
+  const niceDate = (v?: string | null) => (v ? new Date(v).toLocaleDateString() : "-");
+  const niceDateTime = (v?: string | null) => (v ? new Date(v).toLocaleString() : "-");
+
+  async function generateRecord() {
+    if (!numericInspectionId) return;
+    setRecordBusy(true);
+    setRecordError(null);
+    setRecordMsg(null);
+    try {
+      const rec = await createMaintenanceRecord(numericInspectionId);
+      setMaintenanceRecord(rec);
+      setRecordMsg("Maintenance record generated from this inspection.");
+      if (header.transformerNo) {
+        const hist = await listMaintenanceHistory(header.transformerNo);
+        setRecordHistory(hist);
+      }
+    } catch (e: any) {
+      setRecordError(e?.message ?? "Unable to generate record");
+    } finally {
+      setRecordBusy(false);
+    }
+  }
+
+
+  async function saveRecord(finalize = false) {
+    if (!maintenanceRecord) return;
+    setRecordBusy(true);
+    setRecordError(null);
+    setRecordMsg(null);
+    try {
+      const updated = await updateMaintenanceRecord(maintenanceRecord.id, {
+        inspectorName: recordForm.inspectorName,
+        status: recordForm.status,
+        voltage: recordForm.voltage,
+        current: recordForm.current,
+        recommendedAction: recordForm.recommendedAction,
+        remarks: recordForm.remarks,
+        recordDate: recordForm.recordDate,
+        finalizeRecord: finalize,
+      });
+      setMaintenanceRecord(updated);
+      setRecordMsg(finalize ? "Record finalized." : "Record saved.");
+    } catch (e: any) {
+      setRecordError(e?.message ?? "Failed to save record");
+    } finally {
+      setRecordBusy(false);
+    }
+  }
+
   /* ----- File pickers ----- */
   const baseInputRef = useRef<HTMLInputElement | null>(null);
   const maintInputRef = useRef<HTMLInputElement | null>(null);
@@ -507,6 +630,9 @@ const mergedLogs = useMemo<LogItem[]>(() => {
   // shared zoom ref for maintenance image
   const zoomRef = useRef<ZoomHandle | null>(null);
   const hasMaint = Boolean(maintUrl);
+
+  const recordStatus: MaintenanceStatus = maintenanceRecord?.status ?? "NEEDS_MAINTENANCE";
+  const recordFinalized = Boolean(maintenanceRecord?.finalizedAt);
   
   const numericThreshold = (() => {
     if (typeof temperature === "number") return clampThreshold(temperature);
@@ -1317,6 +1443,399 @@ function updateAnomalyLabelAt(i: number, label: string) {
         </div>
       </div>
 
+      {/* Maintenance record panel */}
+      <div
+        style={{
+          marginTop: 24,
+          display: "grid",
+          gridTemplateColumns: "minmax(440px, 1.1fr) minmax(320px, 0.9fr)",
+          gap: 16,
+          alignItems: "start",
+        }}
+      >
+        <div
+          style={{
+            background: ui.card,
+            border: `1px solid ${ui.border}`,
+            borderRadius: 16,
+            padding: 16,
+            boxShadow: ui.shadow,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ fontSize: 20, fontWeight: 900 }}>Maintenance Record</div>
+              <span
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: recordStatus === "OK" ? "#dcfce7" : recordStatus === "URGENT_ATTENTION" ? "#fee2e2" : "#fef9c3",
+                  color: recordStatus === "OK" ? "#166534" : recordStatus === "URGENT_ATTENTION" ? "#991b1b" : "#92400e",
+                  fontWeight: 900,
+                  border: `1px solid ${ui.border}`,
+                }}
+              >
+                {recordStatus.replace("_", " ")}
+              </span>
+              {recordFinalized && (
+                <span
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 10,
+                    background: "#e0f2fe",
+                    color: "#075985",
+                    fontWeight: 800,
+                    border: `1px solid ${ui.border}`,
+                  }}
+                >
+                  Finalized
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={generateRecord}
+                disabled={Boolean(maintenanceRecord) || !maintMeta || recordBusy}
+                style={zoomBtnStyle(Boolean(maintenanceRecord) || !maintMeta || recordBusy)}
+                title="Generate one record per inspection"
+              >
+                Generate from inspection
+              </button>
+              <button
+                onClick={() => window.print()}
+                style={zoomBtnStyle(false)}
+                title="Print or save as PDF"
+              >
+                Download PDF
+              </button>
+            </div>
+          </div>
+
+          <div style={{ color: ui.sub, fontWeight: 700, marginTop: 6 }}>
+            {maintenanceRecord
+              ? "Record is locked to this inspection; anomalies are snapshotted for traceability."
+              : "Generate a record once per inspection after uploading a maintenance image."}
+          </div>
+
+          {recordError && (
+            <div style={{ marginTop: 8, color: ui.danger, fontWeight: 800 }}>
+              {recordError}
+            </div>
+          )}
+          {recordMsg && (
+            <div style={{ marginTop: 8, color: "#0f766e", fontWeight: 800 }}>
+              {recordMsg}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+              gap: 10,
+              marginTop: 14,
+            }}
+          >
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Transformer: <span style={{ fontWeight: 900 }}>{header.transformerNo}</span>
+            </div>
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Branch: <span style={{ fontWeight: 900 }}>{header.branch}</span>
+            </div>
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Inspection: <span style={{ fontWeight: 900 }}>{header.lastUpdated}</span>
+            </div>
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Record date: <span style={{ fontWeight: 900 }}>{maintenanceRecord?.recordDate ?? "-"}</span>
+            </div>
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Created: <span style={{ fontWeight: 900 }}>{niceDateTime(maintenanceRecord?.createdAt ?? null)}</span>
+            </div>
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Updated: <span style={{ fontWeight: 900 }}>{niceDateTime(maintenanceRecord?.updatedAt ?? null)}</span>
+            </div>
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Finalized: <span style={{ fontWeight: 900 }}>{niceDateTime(maintenanceRecord?.finalizedAt ?? null)}</span>
+            </div>
+            <div style={{ fontWeight: 800, color: "#334155" }}>
+              Version: <span style={{ fontWeight: 900 }}>{maintenanceRecord?.version ?? 1}</span>
+            </div>
+          </div>
+
+          {maintUrl && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>Maintenance image</div>
+              <img
+                src={maintUrl}
+                alt="Maintenance"
+                style={{
+                  width: "100%",
+                  maxHeight: 260,
+                  objectFit: "cover",
+                  borderRadius: 12,
+                  border: `1px solid ${ui.border}`,
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 8 }}>Anomaly snapshot</div>
+            {maintenanceRecord ? (
+              recordAnomalies.length ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {recordAnomalies.map((a, idx) => (
+                    <div
+                      key={`${a.id ?? `${a.x}-${a.y}-${idx}`}`}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: `1px solid ${ui.border}`,
+                        background: "#f8fafc",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontWeight: 900, color: "#0f172a" }}>
+                          {a.label || "Unlabeled"} (#{idx + 1})
+                        </div>
+                        {a.score !== undefined && (
+                          <div style={{ color: ui.sub, fontWeight: 800 }}>score: {a.score?.toFixed ? a.score.toFixed(2) : a.score}</div>
+                        )}
+                      </div>
+                      <div style={{ color: ui.sub, fontWeight: 700 }}>
+                        Box: x:{a.x}, y:{a.y}, w:{a.width}, h:{a.height}
+                      </div>
+                      {a.comment && (
+                        <div style={{ color: "#334155", fontWeight: 700 }}>Note: {a.comment}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: ui.sub, fontWeight: 700 }}>No anomalies captured for this record.</div>
+              )
+            ) : (
+              <div style={{ color: ui.sub, fontWeight: 700 }}>Generate a record to snapshot anomalies.</div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 8 }}>Record history</div>
+            {recordHistory.length ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                {recordHistory.slice(0, 4).map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      border: `1px solid ${ui.border}`,
+                      borderRadius: 12,
+                      padding: "8px 10px",
+                      background: "#f1f5f9",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontWeight: 800, color: "#0f172a" }}>
+                      {niceDate(r.createdAt ?? null)} - {r.status?.replace("_", " ")}
+                    </div>
+                    <div style={{ color: ui.sub, fontWeight: 700 }}>
+                      {r.inspectorName || "Unassigned"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: ui.sub, fontWeight: 700 }}>No past maintenance records for this transformer yet.</div>
+            )}
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: ui.card,
+            border: `2px solid ${ui.border}`,
+            borderRadius: 16,
+            padding: 16,
+            boxShadow: ui.shadow,
+          }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 6 }}>Engineer inputs</div>
+          <div style={{ color: ui.sub, fontWeight: 700, marginBottom: 10 }}>
+            Editable fields are separate from system-generated content. Save to persist, or finalize to lock the timestamp.
+          </div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#0f172a" }}>
+              Inspector name
+              <input
+                type="text"
+                value={recordForm.inspectorName}
+                onChange={(e) => setRecordForm((f) => ({ ...f, inspectorName: e.target.value }))}
+                disabled={!maintenanceRecord || recordBusy}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: `1px solid ${ui.border}`,
+                  background: maintenanceRecord ? "#fff" : "#f8fafc",
+                  fontWeight: 700,
+                }}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#0f172a" }}>
+              Status
+              <select
+                value={recordForm.status}
+                onChange={(e) => setRecordForm((f) => ({ ...f, status: e.target.value as MaintenanceStatus }))}
+                disabled={!maintenanceRecord || recordBusy}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: `1px solid ${ui.border}`,
+                  background: maintenanceRecord ? "#fff" : "#f8fafc",
+                  fontWeight: 800,
+                }}
+              >
+                <option value="OK">OK</option>
+                <option value="NEEDS_MAINTENANCE">Needs Maintenance</option>
+                <option value="URGENT_ATTENTION">Urgent Attention</option>
+              </select>
+            </label>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+              <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#0f172a" }}>
+                Voltage
+                <input
+                  type="text"
+                  value={recordForm.voltage}
+                  onChange={(e) => setRecordForm((f) => ({ ...f, voltage: e.target.value }))}
+                  disabled={!maintenanceRecord || recordBusy}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: `1px solid ${ui.border}`,
+                    background: maintenanceRecord ? "#fff" : "#f8fafc",
+                    fontWeight: 700,
+                  }}
+                  placeholder="e.g. 11kV"
+                />
+              </label>
+              <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#0f172a" }}>
+                Current
+                <input
+                  type="text"
+                  value={recordForm.current}
+                  onChange={(e) => setRecordForm((f) => ({ ...f, current: e.target.value }))}
+                  disabled={!maintenanceRecord || recordBusy}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: `1px solid ${ui.border}`,
+                    background: maintenanceRecord ? "#fff" : "#f8fafc",
+                    fontWeight: 700,
+                  }}
+                  placeholder="e.g. 150A"
+                />
+              </label>
+            </div>
+
+            <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#0f172a" }}>
+              Recommended action
+              <textarea
+                value={recordForm.recommendedAction}
+                onChange={(e) => setRecordForm((f) => ({ ...f, recommendedAction: e.target.value }))}
+                disabled={!maintenanceRecord || recordBusy}
+                style={{
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: `1px solid ${ui.border}`,
+                  minHeight: 80,
+                  background: maintenanceRecord ? "#fff" : "#f8fafc",
+                  fontWeight: 700,
+                }}
+                placeholder="Planned maintenance or follow-up actions"
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#0f172a" }}>
+              Additional remarks
+              <textarea
+                value={recordForm.remarks}
+                onChange={(e) => setRecordForm((f) => ({ ...f, remarks: e.target.value }))}
+                disabled={!maintenanceRecord || recordBusy}
+                style={{
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: `1px solid ${ui.border}`,
+                  minHeight: 80,
+                  background: maintenanceRecord ? "#fff" : "#f8fafc",
+                  fontWeight: 700,
+                }}
+                placeholder="Context, conditions, or notes"
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#0f172a" }}>
+              Record date
+              <input
+                type="date"
+                value={recordForm.recordDate}
+                onChange={(e) => setRecordForm((f) => ({ ...f, recordDate: e.target.value }))}
+                disabled={!maintenanceRecord || recordBusy}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: `1px solid ${ui.border}`,
+                  background: maintenanceRecord ? "#fff" : "#f8fafc",
+                  fontWeight: 700,
+                }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            <button
+              onClick={() => saveRecord(false)}
+              disabled={!maintenanceRecord || recordBusy}
+              style={zoomBtnStyle(!maintenanceRecord || recordBusy)}
+            >
+              Save record
+            </button>
+            <button
+              onClick={() => saveRecord(true)}
+              disabled={!maintenanceRecord || recordBusy || recordFinalized}
+              style={zoomBtnStyle(!maintenanceRecord || recordBusy || recordFinalized)}
+              title="Lock this record with a finalize timestamp"
+            >
+              Finalize
+            </button>
+            <button
+              onClick={() => {
+                if (!maintenanceRecord) return;
+                setRecordForm({
+                  inspectorName: maintenanceRecord.inspectorName ?? "",
+                  status: maintenanceRecord.status ?? "NEEDS_MAINTENANCE",
+                  voltage: maintenanceRecord.electricalReadings?.voltage ?? "",
+                  current: maintenanceRecord.electricalReadings?.current ?? "",
+                  recommendedAction: maintenanceRecord.recommendedAction ?? "",
+                  remarks: maintenanceRecord.remarks ?? "",
+                  recordDate: maintenanceRecord.recordDate ?? (inspection?.inspectionDate ?? ""),
+                });
+              }}
+              disabled={!maintenanceRecord || recordBusy}
+              style={zoomBtnStyle(!maintenanceRecord || recordBusy)}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Error line */}
       {error && (
         <div style={{ marginTop: 16, color: ui.danger, fontWeight: 800 }}>
@@ -1399,3 +1918,4 @@ function updateAnomalyLabelAt(i: number, label: string) {
     </div>
   );
 }
+
