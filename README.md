@@ -18,7 +18,7 @@ University of Moratuwa
 
 ---
 
-# 1. Overview
+## 1. Overview
 
 **EN3350-TransTrack** digitizes the entire workflow of transformer thermal inspections:
 
@@ -32,29 +32,29 @@ The system implements **all Functional Requirements (FR1.1–FR4.3)** from the o
 
 ---
 
-# 2. Features Summary (FR1–FR4 Fully Completed)
+## 2. Features Summary (FR1–FR4 Fully Completed)
 
-## **Phase 1 – Transformer & Baseline Image Management**
+### **Phase 1 – Transformer & Baseline Image Management**
 
-### ✔ FR1.1 Transformer Management
+#### ✔ FR1.1 Transformer Management
 - Add, view, edit, delete transformer records  
 - Store ID, location, capacity, and metadata  
 - Structured admin dashboard
 
-### ✔ FR1.2 Thermal Image Upload + Tagging
+#### ✔ FR1.2 Thermal Image Upload + Tagging
 - Upload **Baseline** and **Maintenance** images  
 - Associate images with transformers and inspection sessions  
 - Store metadata: date, uploader, type, transformer, inspection ID
 
-### ✔ FR1.3 Environmental Categorization
+#### ✔ FR1.3 Environmental Categorization
 - Baseline uploads include **Sunny / Cloudy / Rainy** tagging  
 - Weather metadata saved and queryable
 
 ---
 
-## **Phase 2 – Automated Anomaly Detection**
+### **Phase 2 – Automated Anomaly Detection**
 
-### ✔ FR2.1 AI Comparison Engine
+#### ✔ FR2.1 AI Comparison Engine
 - FastAPI YOLOv5 model  
 - Compares maintenance vs. baseline images  
 - Detects thermal anomalies:
@@ -62,28 +62,28 @@ The system implements **all Functional Requirements (FR1.1–FR4.3)** from the o
   - Temperature deviations  
   - Asymmetries  
 
-### ✔ FR2.2 Side-by-Side Comparison UI
+#### ✔ FR2.2 Side-by-Side Comparison UI
 - Baseline and maintenance images shown side-by-side
 - Zoom, pan, and reset tools
 - Overlays of detected anomalies
 
-### ✔ FR2.3 Automatic Anomaly Marking
+#### ✔ FR2.3 Automatic Anomaly Marking
 - Bounding boxes and severity metadata
 - Confidence scores
 - Stored in DB for Phase 3 interaction
 
 ---
 
-## **Phase 3 – Interactive Annotation & Feedback**
+### **Phase 3 – Interactive Annotation & Feedback**
 
-### ✔ FR3.1 Annotation Tools
+#### ✔ FR3.1 Annotation Tools
 - Engineers can:
   - Drag/resize predicted boxes
   - Delete wrong detections
   - Add new anomalies (box or polygon)
 - Supports comments + notes
 
-### ✔ FR3.2 Persistence of Annotations
+#### ✔ FR3.2 Persistence of Annotations
 - Every annotation (added/edited/deleted) saved automatically  
 - Metadata:
   - User ID  
@@ -92,7 +92,7 @@ The system implements **all Functional Requirements (FR1.1–FR4.3)** from the o
   - Geometry  
 - Reloads instantly when image is opened again
 
-### ✔ FR3.3 Feedback Loop for Model Improvement
+#### ✔ FR3.3 Feedback Loop for Model Improvement
 - Exportable JSON/CSV log including:
   - Original AI detections
   - Final human annotations  
@@ -101,9 +101,9 @@ The system implements **all Functional Requirements (FR1.1–FR4.3)** from the o
 
 ---
 
-## **Phase 4 – Maintenance Record Sheet Generation**
+### **Phase 4 – Maintenance Record Sheet Generation**
 
-### ✔ FR4.1 Maintenance Record Form
+#### ✔ FR4.1 Maintenance Record Form
 For each processed inspection, system auto-generates a digital maintenance form including:
 
 - Transformer metadata  
@@ -112,7 +112,7 @@ For each processed inspection, system auto-generates a digital maintenance form 
 - Anomaly markers (from Phase 3)  
 - Full anomaly list with descriptions, severity, and notes  
 
-### ✔ FR4.2 Engineer Editable Fields
+#### ✔ FR4.2 Engineer Editable Fields
 Engineers can fill:
 
 - Inspector name  
@@ -121,7 +121,7 @@ Engineers can fill:
 - Recommended actions  
 - Additional remarks  
 
-### ✔ FR4.3 Record Saving + Retrieval
+#### ✔ FR4.3 Record Saving + Retrieval
 - Records saved to DB  
 - Versioned + timestamped  
 - View history of records per transformer  
@@ -129,9 +129,9 @@ Engineers can fill:
 
 ---
 
-# 3. System Architecture
+## 3. System Architecture
 
-## **High-Level Architecture**
+### **High-Level Architecture**
 
                +------------------------------+
                |          Frontend            |
@@ -156,8 +156,10 @@ Engineers can fill:
 
 ---
 
-# 4. Folder Structure
+---
+## 4. Folder Structure
 
+```
 EN3350-TransTrack/
 │
 ├── AI_backend/
@@ -181,11 +183,12 @@ EN3350-TransTrack/
 ├── README.md
 │ 
 └── transtrack_db.sql
+```
 ---
 
-# 5. Tech Stack
+## 5. Tech Stack
 
-## **Backend — Spring Boot**
+### **Backend — Spring Boot**
 - Java 21  
 - Spring Boot 3.5  
 - Spring Data JPA (MySQL 8)  
@@ -194,7 +197,7 @@ EN3350-TransTrack/
 - Springdoc OpenAPI  
 - All APIs return **ResponseEntity**  
 
-## **Frontend — React + TypeScript**
+### **Frontend — React + TypeScript**
 - React 19  
 - Vite  
 - Axios  
@@ -206,7 +209,7 @@ EN3350-TransTrack/
   - Annotation tools  
   - Maintenance forms  
 
-## **AI Backend — FastAPI**
+### **AI Backend — FastAPI**
 - FastAPI  
 - Pydantic  
 - YOLOv5 inference  
@@ -215,15 +218,15 @@ EN3350-TransTrack/
 
 ---
 
-# 6. API Endpoints (Summary)
+## 6. API Endpoints (Summary)
 
-## **Auth**
+### **Auth**
 | Method | Endpoint | Description |
 |-------|----------|-------------|
 | POST | `/auth/register` | Register |
 | POST | `/auth/login` | Login |
 
-## **Transformers**
+### **Transformers**
 | Method | Endpoint | Description |
 |-------|----------|-------------|
 | POST | `/transformers` | Create transformer |
@@ -233,7 +236,7 @@ EN3350-TransTrack/
 | PUT | `/transformers/{id}` | Update |
 | DELETE | `/transformers/{id}` | Delete |
 
-## **Inspections**
+### **Inspections**
 | Method | Endpoint | Description |
 |-------|----------|-------------|
 | POST | `/inspections` | Create inspection |
@@ -243,7 +246,7 @@ EN3350-TransTrack/
 | PUT | `/inspections/{id}` | Update |
 | DELETE | `/inspections/{id}` | Delete |
 
-## **Images**
+### **Images**
 | Method | Endpoint | Description |
 |-------|----------|-------------|
 | POST | `/inspections/{id}/images` | Upload image |
@@ -251,13 +254,13 @@ EN3350-TransTrack/
 | GET | `/inspections/{id}/images/{imageId}/file` | Get file |
 | DELETE | `/inspections/{id}/images/{imageId}` | Delete |
 
-## **Annotations**
+### **Annotations**
 | Method | Endpoint | Description |
 |-------|----------|-------------|
 | PUT | `/inspections/{id}/images/{imageId}/anomalies` | Replace anomaly list |
 | DELETE | `/inspections/{id}/images/{imageId}/anomalies/{anomId}` | Delete anomaly |
 
-## **Maintenance Records**
+### **Maintenance Records**
 | Method | Endpoint | Description |
 |-------|----------|-------------|
 | POST | `/records` | Create maintenance record |
@@ -266,13 +269,16 @@ EN3350-TransTrack/
 
 ---
 
-# 7. Getting Started
+## 7. Getting Started
 
-## **Backend**
+### **Backend**
 ```bash
 cd transtrack_backend_EN3350
 ./mvnw spring-boot:run
 ```
 ### Set DB credentials in:
 
+```
 application.properties
+```
+
