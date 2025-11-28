@@ -92,4 +92,33 @@ export type ZoomableImageProps = {
   onCreateComplete?: (box: AnomalyMeta) => void;
 };
 
+export type MaintenanceStatus = "OK" | "NEEDS_MAINTENANCE" | "URGENT_ATTENTION";
+
+export type ElectricalReadings = {
+  voltage?: string;
+  current?: string;
+};
+
+export type MaintenanceRecord = {
+  id: number;
+  inspectionNo: number;
+  transformerNo: string;
+  branch?: string;
+  inspectionDate?: string;
+  inspectionTime?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  finalizedAt?: string | null;
+  recordDate?: string | null;
+  version?: number;
+  inspectorName?: string;
+  status?: MaintenanceStatus;
+  electricalReadings?: ElectricalReadings;
+  recommendedAction?: string;
+  remarks?: string;
+  maintenanceImageId?: number;
+  maintenanceImageUrl?: string;
+  anomalies?: AnomalyMeta[];
+};
+
 
