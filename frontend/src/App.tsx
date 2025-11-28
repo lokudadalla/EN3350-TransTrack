@@ -1,19 +1,17 @@
-import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import Transformers from "./pages/Transformers";
 import TransformerDetail from "./pages/TransformerDetail";
-import InspectionsPage from "./pages/InspectionsPage"; 
-import InspectionDetail from "./pages/InspectionDetail"; 
+import InspectionsPage from "./pages/InspectionsPage";
+import InspectionDetail from "./pages/InspectionDetail";
+import MaintenanceHistoryPage from "./pages/MaintenanceHistory";
 import Profile from "./pages/Profile";
 import SegmentTabs from "./components/SegmentTabs";
 import UserMenu from "./components/UserMenu";
 import "./index.css";
-
-// App.tsx
 import { isAuthed, logout, getUser } from "./auth";
-import { Navigate} from "react-router-dom";
 
 export default function App() {
-  if (!isAuthed()) return <Navigate to="/login" replace />;  // <-- add this line
+  if (!isAuthed()) return <Navigate to="/login" replace />;
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -22,13 +20,11 @@ export default function App() {
   const email = user?.username ?? " ";
   const name = email.split("@")[0];
 
-  const active = location.pathname.startsWith("/inspections")
-    ? "inspections"
-    : "transformers";
+  const active = location.pathname.startsWith("/inspections") ? "inspections" : "transformers";
 
   return (
     <div>
-      {/* Line 1 — Brand + User */}
+      {/* Line 1 – Brand + User */}
       <header
         style={{
           display: "flex",
@@ -60,40 +56,15 @@ export default function App() {
           </div>
           <div>
             <div style={{ fontWeight: 700 }}>TransTrack Admin</div>
-            <div style={{ fontSize: 12, color: "#64748b" }}>EN3350 • Phase 1</div>
+            <div style={{ fontSize: 12, color: "#64748b" }}>EN3350 – Phase 1</div>
           </div>
         </div>
 
-        {/* User menu ) */}
-        {/* <UserMenu
-          user={{
-            name: "Trans Track",
-            email: "transtrack@gmail.com",
-            avatarUrl:
-              "https://i.pravatar.cc/64?img=12", 
-          }}
-          onNavigateProfile={() => navigate("/profile")}
-          onSignOut={() => alert("Sign out: plug your auth here")}
-        /> */}
-        {/* // In your <UserMenu ... /> */}
-        {/* <UserMenu
-          user={{
-            name: "Trans Track",
-            email: "transtrack@gmail.com",
-            avatarUrl: "https://i.pravatar.cc/64?img=12",
-          }}
-          onNavigateProfile={() => navigate("/profile")}
-          onSignOut={() => {           // <-- change this
-            logout();
-            navigate("/login", { replace: true });
-          }}
-        /> */}
-
         <UserMenu
           user={{
-            name,          // e.g. "T"
-            email,         // full email
-            avatarUrl: `https://i.pravatar.cc/64?u=${encodeURIComponent(email)}`, 
+            name,
+            email,
+            avatarUrl: `https://i.pravatar.cc/64?u=${encodeURIComponent(email)}`,
           }}
           onNavigateProfile={() => navigate("/profile")}
           onSignOut={() => {
@@ -101,10 +72,9 @@ export default function App() {
             navigate("/login", { replace: true });
           }}
         />
-
       </header>
 
-      {/* Line 2 — Segmented tabs */}
+      {/* Line 2 – Segmented tabs */}
       <div style={{ padding: "16px 28px 0 28px" }}>
         <SegmentTabs
           active={active}
@@ -121,13 +91,14 @@ export default function App() {
           <Route path="/" element={<Transformers />} />
           <Route path="/transformers" element={<Transformers />} />
           <Route path="/transformers/:id" element={<TransformerDetail />} />
-          <Route path="/transformers/:transformerId/inspections" element={<InspectionsPage />} /> {/* Updated route */}
-          <Route path="/transformers/:transformerId/inspections/:inspectionNo" element={<InspectionDetail />} /> {/* ✅ New detail route */}
+          <Route path="/transformers/:transformerId/inspections" element={<InspectionsPage />} />
+          <Route path="/transformers/:transformerId/inspections/:inspectionNo" element={<InspectionDetail />} />
+          <Route path="/transformers/:transformerId/history" element={<MaintenanceHistoryPage />} />
           <Route path="/profile" element={<Profile />} />
         </Routes>
 
         <footer style={{ marginTop: 28, color: "#64748b", fontSize: 12 }}>
-          © 2025 TransTrack • University of Moratuwa
+          Ac 2025 TransTrack – University of Moratuwa
         </footer>
       </main>
     </div>
