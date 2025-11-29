@@ -52,10 +52,11 @@ public class InferenceServiceImp implements InferenceService {
                 .findTopByInspection_InspectionNoAndTypeOrderByUploadedAtDesc(inspectionId, ImageType.BASELINE)
                 .orElseThrow(() -> new IllegalStateException("No BASELINE image found for this inspection"));
 
-        // 3) Threshold required
+        // 3) Threshold - use default if not set
         Double threshold = inspection.getInferenceThreshold();
         if (threshold == null) {
-            throw new IllegalStateException("inferenceThreshold not set for inspection " + inspectionId);
+            threshold = 0.5; // Default to 50%
+            System.out.println("No inference threshold set for inspection " + inspectionId + ", using default: 0.5");
         }
 
         // 4) Call Python using local disk paths

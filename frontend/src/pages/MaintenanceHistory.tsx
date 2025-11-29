@@ -16,6 +16,13 @@ export default function MaintenanceHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
+  
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [inspectorFilter, setInspectorFilter] = useState<string>("");
+  const [dateFromFilter, setDateFromFilter] = useState<string>("");
+  const [dateToFilter, setDateToFilter] = useState<string>("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "status">("newest");
 
   useEffect(() => {
     let cancelled = false;
@@ -70,10 +77,71 @@ export default function MaintenanceHistoryPage() {
     };
   }, [records, imageUrls]);
 
-  const sorted = useMemo(
-    () => records.slice().sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()),
-    [records]
-  );
+  // Get unique inspectors for filter dropdown
+  const uniqueInspectors = useMemo(() => {
+    const inspectors = records
+      .map(r => r.inspectorName)
+      .filter((name): name is string => !!name);
+    return Array.from(new Set(inspectors));
+  }, [records]);
+
+  // Apply filters and sorting
+  const filtered = useMemo(() => {
+    let result = records.slice();
+
+    // Status filter
+    if (statusFilter !== "ALL") {
+      result = result.filter(r => r.status === statusFilter);
+    }
+
+    // Inspector filter
+    if (inspectorFilter) {
+      result = result.filter(r => 
+        r.inspectorName?.toLowerCase().includes(inspectorFilter.toLowerCase())
+      );
+    }
+
+    // Date range filter
+    if (dateFromFilter) {
+      const from = new Date(dateFromFilter).getTime();
+      result = result.filter(r => {
+        const recordDate = r.recordDate ? new Date(r.recordDate).getTime() : 0;
+        return recordDate >= from;
+      });
+    }
+    if (dateToFilter) {
+      const to = new Date(dateToFilter).getTime();
+      result = result.filter(r => {
+        const recordDate = r.recordDate ? new Date(r.recordDate).getTime() : 0;
+        return recordDate <= to;
+      });
+    }
+
+    // Sorting
+    if (sortBy === "newest") {
+      result.sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+    } else if (sortBy === "oldest") {
+      result.sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+    } else if (sortBy === "status") {
+      const statusOrder = { "URGENT_ATTENTION": 0, "NEEDS_MAINTENANCE": 1, "OK": 2 };
+      result.sort((a, b) => {
+        const aOrder = statusOrder[a.status as keyof typeof statusOrder] ?? 3;
+        const bOrder = statusOrder[b.status as keyof typeof statusOrder] ?? 3;
+        return aOrder - bOrder;
+      });
+    }
+
+    return result;
+  }, [records, statusFilter, inspectorFilter, dateFromFilter, dateToFilter, sortBy]);
+
+  const hasActiveFilters = statusFilter !== "ALL" || inspectorFilter || dateFromFilter || dateToFilter;
+  
+  const clearFilters = () => {
+    setStatusFilter("ALL");
+    setInspectorFilter("");
+    setDateFromFilter("");
+    setDateToFilter("");
+  };
 
   return (
     <div className="vstack" style={{ gap: 14 }}>
@@ -81,7 +149,7 @@ export default function MaintenanceHistoryPage() {
         <div>
           <div style={{ fontSize: 22, fontWeight: 900 }}>Maintenance History</div>
           <div style={{ color: ui.sub, fontWeight: 700 }}>
-            Transformer {transformerId ?? "-"} · {sorted.length} record(s)
+            Transformer {transformerId ?? "-"} · {filtered.length} of {records.length} record(s)
           </div>
         </div>
         <div className="hstack" style={{ gap: 8 }}>
@@ -91,15 +159,162 @@ export default function MaintenanceHistoryPage() {
         </div>
       </div>
 
+      {/* Filter Panel */}
+      <div style={{
+        border: `1px solid ${ui.border}`,
+        borderRadius: 14,
+        padding: 16,
+        background: ui.card,
+        boxShadow: ui.shadow,
+        display: "grid",
+        gap: 12,
+      }}>
+        <div style={{ fontWeight: 800, fontSize: 16, color: "#0f172a" }}>
+          🔍 Filter & Sort
+        </div>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+          {/* Status Filter */}
+          <div style={{ display: "grid", gap: 4 }}>
+            <label style={{ fontWeight: 700, fontSize: 13, color: ui.sub }}>Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: `1px solid ${ui.border}`,
+                fontWeight: 700,
+                background: "white",
+              }}
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="OK">OK</option>
+              <option value="NEEDS_MAINTENANCE">Needs Maintenance</option>
+              <option value="URGENT_ATTENTION">Urgent Attention</option>
+            </select>
+          </div>
+
+          {/* Inspector Filter */}
+          <div style={{ display: "grid", gap: 4 }}>
+            <label style={{ fontWeight: 700, fontSize: 13, color: ui.sub }}>Inspector</label>
+            <input
+              type="text"
+              placeholder="Search by inspector..."
+              value={inspectorFilter}
+              onChange={(e) => setInspectorFilter(e.target.value)}
+              list="inspectors-list"
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: `1px solid ${ui.border}`,
+                fontWeight: 700,
+              }}
+            />
+            <datalist id="inspectors-list">
+              {uniqueInspectors.map(name => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </div>
+
+          {/* Date From */}
+          <div style={{ display: "grid", gap: 4 }}>
+            <label style={{ fontWeight: 700, fontSize: 13, color: ui.sub }}>Date From</label>
+            <input
+              type="date"
+              value={dateFromFilter}
+              onChange={(e) => setDateFromFilter(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: `1px solid ${ui.border}`,
+                fontWeight: 700,
+              }}
+            />
+          </div>
+
+          {/* Date To */}
+          <div style={{ display: "grid", gap: 4 }}>
+            <label style={{ fontWeight: 700, fontSize: 13, color: ui.sub }}>Date To</label>
+            <input
+              type="date"
+              value={dateToFilter}
+              onChange={(e) => setDateToFilter(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: `1px solid ${ui.border}`,
+                fontWeight: 700,
+              }}
+            />
+          </div>
+
+          {/* Sort By */}
+          <div style={{ display: "grid", gap: 4 }}>
+            <label style={{ fontWeight: 700, fontSize: 13, color: ui.sub }}>Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: `1px solid ${ui.border}`,
+                fontWeight: 700,
+                background: "white",
+              }}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="status">By Status (Urgent → OK)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Clear Filters Button */}
+        {hasActiveFilters && (
+          <div className="hstack" style={{ gap: 8 }}>
+            <button
+              onClick={clearFilters}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: `1px solid ${ui.border}`,
+                background: "#fee2e2",
+                color: "#991b1b",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              ✕ Clear Filters
+            </button>
+            <span style={{ color: ui.sub, fontWeight: 700 }}>
+              Showing {filtered.length} of {records.length} records
+            </span>
+          </div>
+        )}
+      </div>
+
       {error && <div style={{ color: ui.danger, fontWeight: 800 }}>{error}</div>}
 
       {loading ? (
         <div>Loading history…</div>
-      ) : sorted.length === 0 ? (
+      ) : records.length === 0 ? (
         <div style={{ color: ui.sub, fontWeight: 700 }}>No maintenance records found for this transformer.</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ 
+          padding: 24, 
+          textAlign: "center",
+          border: `1px dashed ${ui.border}`,
+          borderRadius: 14,
+          color: ui.sub,
+          fontWeight: 700 
+        }}>
+          No records match your filters. Try adjusting your search criteria.
+        </div>
       ) : (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
-          {sorted.map((rec) => {
+          {filtered.map((rec) => {
             const anomalyCount = rec.anomalies?.length ?? 0;
             return (
               <div
